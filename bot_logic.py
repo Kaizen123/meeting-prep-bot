@@ -304,10 +304,10 @@ def is_brand_match(brand1, brand2):
         return True
         
     return False
-# ========== UPGRADED FUNCTION 1: Search for LinkedIn & Recent Posts ==========
-def search_attendee_intel(email, raw_name, company_name, gemini_llm_client, is_testing_mode=False):
+# ========== UPGRADED FUNCTION 1: Search for LinkedIn & Recent Posts (LIVE SERPER MODE) ==========
+def search_attendee_intel(email, raw_name, company_name, gemini_llm_client):
     """
-    Profiles attendees using Serper.dev if in testing mode, otherwise falls back to native Google Grounding.
+    Profiles attendees using Serper.dev across all production meetings.
     Handles personal profiles vs activity posts dynamically.
     """
     if not gemini_llm_client:
@@ -316,84 +316,49 @@ def search_attendee_intel(email, raw_name, company_name, gemini_llm_client, is_t
     email_prefix = email.split('@')[0] if '@' in email else email
     domain = email.split('@')[1] if '@' in email else ""
 
-    if is_testing_mode:
-        search_query = f"{raw_name or email_prefix} {company_name or domain} India LinkedIn"
-        print(f"    🔍 [Attendee Search] Querying Serper: '{search_query}'")
-        search_context = execute_serper_search_api(search_query, num_results=4)
-        
-        prompt = f"""
-        You are an expert OSINT researcher profiling a meeting attendee.
-        Email: '{email}' | Company Name: '{company_name}' in India.
-        Raw Name from calendar: '{raw_name}'
+    search_query = f"{raw_name or email_prefix} {company_name or domain} India LinkedIn"
+    print(f"    🔍 [Attendee Search] Querying Serper: '{search_query}'")
+    search_context = execute_serper_search_api(search_query, num_results=4)
+    
+    prompt = f"""
+    You are an expert OSINT researcher profiling a meeting attendee.
+    Email: '{email}' | Company Name: '{company_name}' in India.
+    Raw Name from calendar: '{raw_name}'
 
-        Here are real-time search results:
-        ---
-        {search_context}
-        ---
+    Here are real-time search results:
+    ---
+    {search_context}
+    ---
 
-        Task 1: Deduce their correct full name.
-        Task 2: Extract their personal profile URL (must contain 'linkedin.com/in/').
-        Task 3: Extract any recent post/activity link from the search results (usually contains 'linkedin.com/posts/').
+    Task 1: Deduce their correct full name.
+    Task 2: Extract their personal profile URL (must contain 'linkedin.com/in/').
+    Task 3: Extract any recent post/activity link from the search results (usually contains 'linkedin.com/posts/').
 
-        RULES:
-        1. Only return URLs present in the search data. Do not make up links.
-        2. Do not return company pages, only personal profiles or their direct post URLs.
-        3. If no matching LinkedIn profile is found, return null.
+    RULES:
+    1. Only return URLs present in the search data. Do not make up links.
+    2. Do not return company pages, only personal profiles or their direct post URLs.
+    3. If no matching LinkedIn profile is found, return null.
 
-        Return ONLY a JSON object:
-        {{
-            "inferred_name": "Full Name",
-            "linkedin_url": "https://www.linkedin.com/in/... or null",
-            "recent_post_url": "https://www.linkedin.com/posts/... or null",
-            "post_context": "Short description of post topic or null"
-        }}
-        """
-        config = types.GenerateContentConfig(temperature=0.0, response_mime_type="application/json")
-        try:
-            response = gemini_llm_client.models.generate_content(model="gemini-2.5-flash", contents=prompt, config=config)
-            data = json.loads(response.text.strip())
-            return data
-        except Exception as e:
-            print(f"  Error parsing Serper response for {email}: {e}")
-            return {"inferred_name": raw_name.title() or email_prefix.title(), "linkedin_url": None, "recent_post_url": None, "post_context": None}
-            
-    else:
-        # Standard native Google Grounding logic - Strip response_mime_type to resolve Google's API conflict
-        search_prompt = f"""
-        You are an expert OSINT researcher profiling a meeting attendee.
-        Email Prefix: '{email_prefix}'
-        Domain: '{domain}'
-        Company Name: '{company_name}' in India.
-        Raw Name from calendar: '{raw_name}'
-
-        Task 1: Deduce the person's likely full human name from the email prefix.
-        Task 2: Use Google Search to find their exact official LinkedIn profile URL.
-        Task 3: Search if this specific person has recently posted on LinkedIn regarding '{company_name}'.
-
-        Return ONLY a valid JSON object in this exact format (no other text, markdown fences or quotes):
-        {{
-            "inferred_name": "Full Name",
-            "linkedin_url": "https://www.linkedin.com/in/... or null",
-            "recent_post_url": "https://... or null",
-            "post_context": "Short description of the post or null"
-        }}
-        """
-        grounding_tool = types.Tool(google_search=types.GoogleSearch())
-        config = types.GenerateContentConfig(temperature=0.0, tools=[grounding_tool])
-        try:
-            response = gemini_llm_client.models.generate_content(model="gemini-2.5-flash", contents=search_prompt, config=config)
-            response_text = response.text.strip()
-            # Clean any possible markdown fences generated by the model
-            cleaned_json = re.sub(r'```json\s*|\s*```', '', response_text).strip()
-            data = json.loads(cleaned_json)
-            return data
-        except Exception as e:
-            print(f"  Error using native grounding for {email}: {e}")
-            return {"inferred_name": raw_name.title(), "linkedin_url": None, "recent_post_url": None, "post_context": None}
+    Return ONLY a JSON object:
+    {{
+        "inferred_name": "Full Name",
+        "linkedin_url": "https://www.linkedin.com/in/... or null",
+        "recent_post_url": "https://www.linkedin.com/posts/... or null",
+        "post_context": "Short description of post topic or null"
+    }}
+    """
+    config = types.GenerateContentConfig(temperature=0.0, response_mime_type="application/json")
+    try:
+        response = gemini_llm_client.models.generate_content(model="gemini-2.5-flash", contents=prompt, config=config)
+        data = json.loads(response.text.strip())
+        return data
+    except Exception as e:
+        print(f"  Error parsing Serper response for {email}: {e}")
+        return {"inferred_name": raw_name.title() or email_prefix.title(), "linkedin_url": None, "recent_post_url": None, "post_context": None}
 
 
 # ========== UPGRADED FUNCTION 2: Get LinkedIn & Posts for All Attendees ==========
-def get_brand_attendees_linkedin_info(brand_attendees_list, brand_name, gemini_llm_client, is_testing_mode=False):
+def get_brand_attendees_linkedin_info(brand_attendees_list, brand_name, gemini_llm_client):
     """
     For each brand attendee, search for their LinkedIn profile and recent activity.
     Returns a list with clean names, LinkedIn URLs, and Post URLs added.
@@ -406,8 +371,8 @@ def get_brand_attendees_linkedin_info(brand_attendees_list, brand_name, gemini_l
         
         print(f"    🔍 Searching OSINT Intel for: {attendee_email} at {brand_name}")
         
-        # Call search function passing the testing mode parameter
-        intel_data = search_attendee_intel(attendee_email, attendee_name, brand_name, gemini_llm_client, is_testing_mode)
+        # Call optimized Serper search function
+        intel_data = search_attendee_intel(attendee_email, attendee_name, brand_name, gemini_llm_client)
         
         if not intel_data:
             intel_data = {"inferred_name": attendee_name, "linkedin_url": None, "recent_post_url": None, "post_context": None}
@@ -420,101 +385,53 @@ def get_brand_attendees_linkedin_info(brand_attendees_list, brand_name, gemini_l
             'post_context': intel_data.get('post_context')
         })
         
-        print("    ⏳ Waiting 10s to respect API quota...")
-        time.sleep(10)
+        # Reduced buffer to speed up real-time execution while respecting rate limits
+        print("    ⏳ Waiting 1.5s between attendee queries...")
+        time.sleep(1.5)
     
     return attendees_with_intel
 
-# ========== NEW FUNCTION 3: Find Potential Key Contacts (FIXED) ==========
-def find_potential_key_contacts(brand_name, gemini_llm_client, is_testing_mode=False):
+# ========== NEW FUNCTION 3: Find Potential Key Contacts (LIVE SERPER MODE) ==========
+def find_potential_key_contacts(brand_name, gemini_llm_client):
     """
-    Finds 2-3 current Brand Managers or Program Managers at the company in India.
+    Finds 2-3 current execution-level brand leaders at the company in India using Serper.
     """
     if not gemini_llm_client:
         return []
 
-    if is_testing_mode:
-        # Refined query to pull mid-to-lower execution roles prominently
-        search_query = f"{brand_name} India LinkedIn (Brand Manager OR Associate Brand Manager OR Marketing Manager OR Campaign Manager)"
-        print(f"    🔍 [Serper Testing Key Contacts] Querying: {search_query}")
-        search_context = execute_serper_search_api(search_query, num_results=5)
+    # Strict search operators prioritizing mid-level roles directly at the target brand
+    search_query = f'site:linkedin.com/in/ "{brand_name}" ("Brand Manager" OR "Associate Brand Manager" OR "Marketing Manager" OR "Campaign Manager")'
+    print(f"    🔍 [Key Contacts Search] Querying Serper: {search_query}")
+    search_context = execute_serper_search_api(search_query, num_results=5)
 
-        discovery_prompt = f"""
-        You are an expert executive search strategist mapping key decision-makers.
-        Brand: {brand_name} (India)
+    discovery_prompt = f"""
+    You are an expert executive search strategist mapping key decision-makers.
+    Brand: {brand_name} (India)
 
-        Review this organic web search data:
-        ---
-        {search_context}
-        ---
+    Review this organic web search data:
+    ---
+    {search_context}
+    ---
 
-        Task: Identify 2-3 marketing or brand leaders currently in India.
-        RULES:
-        1. Extract their full name, exact title, and verified personal profile link (must contain 'linkedin.com/in/').
-        
-        Return ONLY this JSON format:
-        {{
-          "contacts": [
-            {{"name": "Full Name", "title": "Job Title", "reasoning": "Coordinates partnerships", "linkedin_url": "Profile URL or null"}}
-          ]
-        }}
-        """
-        config = types.GenerateContentConfig(temperature=0.1, response_mime_type="application/json")
-        try:
-            response = gemini_llm_client.models.generate_content(model="gemini-2.5-flash", contents=discovery_prompt, config=config)
-            contacts_data = json.loads(response.text.strip())
-            return contacts_data.get("contacts", [])
-        except Exception as e:
-            print(f"    Error parsing key contacts from Serper: {e}")
-            return []
-            
-    else:
-        # Original production search logic - Update to active gemini-2.5-flash model
-        discovery_prompt = f"""
-        Use Google Search to find 2-3 current marketing or brand professionals at {brand_name} India.
-        Target roles (Priority order):
-        1. Brand Manager / Senior Brand Manager
-        2. Marketing Program Manager
-        3. Media Lead / Digital Marketing Manager
-
-        Return in this EXACT JSON format:
-        {{
-          "contacts": [
-            {{"name": "Full Name", "title": "Job Title", "reasoning": "Manages brand programs and marketing budgets"}}
-          ]
-        }}
-        """
-        grounding_tool = types.Tool(google_search=types.GoogleSearch())
-        config = types.GenerateContentConfig(temperature=0.1, tools=[grounding_tool])
-        try:
-            response = gemini_llm_client.models.generate_content(model="gemini-2.5-flash", contents=discovery_prompt, config=config)
-            result_text = response.text.strip()
-            result_text = re.sub(r'```json\s*|\s*```', '', result_text).strip()
-            contacts_data = json.loads(result_text)
-            discovered_contacts = contacts_data.get("contacts", [])
-            
-            enriched_contacts = []
-            for contact in discovered_contacts[:3]:
-                name = contact.get("name", "")
-                if not name: continue
-                
-                # Check if helper function exists inside local imports, else assign placeholder
-                try:
-                    linkedin_url = search_linkedin_profile(name, brand_name, gemini_llm_client)
-                except NameError:
-                    linkedin_url = None
-                
-                enriched_contacts.append({
-                    'name': name,
-                    'title': contact.get("title", ""),
-                    'reasoning': contact.get("reasoning", "Key decision-maker for NBH collaborations"),
-                    'linkedin_url': linkedin_url if linkedin_url else '(LinkedIn Not Verified)'
-                })
-                time.sleep(2)
-            return enriched_contacts
-        except Exception as e:
-            print(f"    Error in key contact discovery for {brand_name}: {e}")
-            return []
+    Task: Identify 2-3 marketing or brand leaders currently in India.
+    RULES:
+    1. Extract their full name, exact title, and verified personal profile link (must contain 'linkedin.com/in/').
+    
+    Return ONLY this JSON format:
+    {{
+      "contacts": [
+        {{"name": "Full Name", "title": "Job Title", "reasoning": "Coordinates partnerships", "linkedin_url": "Profile URL or null"}}
+      ]
+    }}
+    """
+    config = types.GenerateContentConfig(temperature=0.1, response_mime_type="application/json")
+    try:
+        response = gemini_llm_client.models.generate_content(model="gemini-2.5-flash", contents=discovery_prompt, config=config)
+        contacts_data = json.loads(response.text.strip())
+        return contacts_data.get("contacts", [])
+    except Exception as e:
+        print(f"    Error parsing key contacts from Serper: {e}")
+        return []
 
 class Industry(enum.Enum):
     FMCG = "FMCG"
@@ -1650,7 +1567,7 @@ def configure_gemini():
         return None  
 
 
-def generate_brief_with_gemini(gemini_llm_client, YOUR_DETAILED_PROMPT_TEMPLATE_GEMINI, meeting_data, internal_data_summary_str, is_testing_mode=False):
+def generate_brief_with_gemini(gemini_llm_client, YOUR_DETAILED_PROMPT_TEMPLATE_GEMINI, meeting_data, internal_data_summary_str):
     if not gemini_llm_client:
         return "Error: Gemini model not available."
 
@@ -1692,16 +1609,14 @@ def generate_brief_with_gemini(gemini_llm_client, YOUR_DETAILED_PROMPT_TEMPLATE_
     else:
         potential_contacts_str = "**No additional key contacts found through search.**\n\n"
 
-    # Enforce Serper search context for campaign news during testing mode
-    enriched_internal_summary = internal_data_summary_str
-    if is_testing_mode:
-        print(f"    🔍 [Serper News] Running search for '{meeting_data['brand_name']}' India news...")
-        campaign_search_data = execute_serper_search_api(f"'{meeting_data['brand_name']}' India marketing campaign news 2025 2026", num_results=3)
-        enriched_internal_summary = (
-            f"{internal_data_summary_str}\n\n"
-            f"## RECENT BRAND PUBLIC NEWS & CAMPAIGNS (VERIFIED GOOGLE INDEX):\n"
-            f"{campaign_search_data}\n"
-        )
+    # Execute Serper search for recent campaign news across all production meetings
+    print(f"    🔍 [Serper News] Running search for '{meeting_data['brand_name']}' India news...")
+    campaign_search_data = execute_serper_search_api(f'"{meeting_data["brand_name"]}" (campaign OR launch OR marketing) India (2025 OR 2026)', num_results=3)
+    enriched_internal_summary = (
+        f"{internal_data_summary_str}\n\n"
+        f"## RECENT BRAND PUBLIC NEWS & CAMPAIGNS (VERIFIED GOOGLE INDEX):\n"
+        f"{campaign_search_data}\n"
+    )
 
     prompt_filled = YOUR_DETAILED_PROMPT_TEMPLATE_GEMINI.format(
         MEETING_DATETIME=meeting_data['start_time_str'],
@@ -1717,25 +1632,18 @@ def generate_brief_with_gemini(gemini_llm_client, YOUR_DETAILED_PROMPT_TEMPLATE_
         INTERNAL_NBH_DATA_SUMMARY=enriched_internal_summary
     )
     
-    # Configure generation settings
-    config_args = {
-        "temperature": 0.0,
-        "top_p": 0.95,
-        "top_k": 40,
-        "safety_settings": [
+    # Tool-free config to save API costs and prevent grounding latency
+    config = types.GenerateContentConfig(
+        temperature=0.0,
+        top_p=0.95,
+        top_k=40,
+        safety_settings=[
             types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=types.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE),
             types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold=types.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE),
             types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold=types.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE),
             types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=types.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE),
         ]
-    }
-
-    # Only attach search grounding if we are NOT in Serper testing mode
-    if not is_testing_mode:
-        grounding_tool = types.Tool(google_search=types.GoogleSearch())
-        config_args["tools"] = [grounding_tool]
-
-    config = types.GenerateContentConfig(**config_args)
+    )
 
     print(f"  Sending request to Gemini for brand: {meeting_data['brand_name']}...")
     try:
@@ -2467,19 +2375,14 @@ def main():
         event_summary = event_payload.get('summary', 'No Title')
         event_description_for_tag_check = event_payload.get('description')
 
-        # Determine if this specific meeting is gated for Serper Testing
-        is_testing_mode = "testing" in event_summary.lower()
-
         print(f"\nProcessing event: '{event_summary}' (ID: {event_id})")
 
         # Step 1: Check if the event has already been processed or is currently being processed
-        # Even in testing mode, skip if the final processed tag is already present in the description.
-        # This prevents the background Cloud Scheduler from running loops and spamming your inbox.
         if is_event_already_tagged(event_description_for_tag_check):
             print(f"  Skipping event '{event_summary}': Already tagged as processed.")
             continue
         
-        if not is_testing_mode and event_id in processed_ids_local_file:
+        if event_id in processed_ids_local_file:
             print(f"  Skipping event '{event_summary}': Found in local processed file.")
             continue
 
@@ -2569,21 +2472,13 @@ def main():
         # Step 7: Merge the successful LLM results into the main meeting_data dictionary
         meeting_data.update(brand_details)
 
-        # Determine if this specific meeting is gated for Serper Testing
-        is_testing_mode = "testing" in meeting_data.get('title', '').lower()
-        if is_testing_mode:
-            print("  🧪 [TESTING MODE DETECTED] Activating Serper.dev integration for this event.")
-        else:
-            print("  💼 [PRODUCTION MODE DETECTED] Using standard Google Search Grounding for this event.")
-
         # ========== NEW CODE STARTS HERE ==========
-        # Get LinkedIn profiles for brand attendees
+        # Get LinkedIn profiles for brand attendees using Serper
         print(f"  📱 Fetching LinkedIn profiles for brand attendees...")
         brand_attendees_with_linkedin = get_brand_attendees_linkedin_info(
             meeting_data.get('brand_attendees_info', []),
             meeting_data['brand_name'],
-            gemini_llm_client,
-            is_testing_mode=is_testing_mode # <-- NEW: Pass testing flag
+            gemini_llm_client
         )
         
         # Replace the old brand attendees info with the new one that has LinkedIn URLs
@@ -2591,12 +2486,11 @@ def main():
         # ========== NEW CODE ENDS HERE ==========
 
         # ========== NEW CODE FOR KEY CONTACTS STARTS HERE ==========
-        # Find potential key contacts (people NOT in the meeting)
+        # Find potential key contacts (people NOT in the meeting) using Serper
         print(f"  🎯 Finding potential key contacts at {meeting_data['brand_name']}...")
         potential_key_contacts = find_potential_key_contacts(
             meeting_data['brand_name'],
-            gemini_llm_client,
-            is_testing_mode=is_testing_mode # <-- NEW: Pass testing flag
+            gemini_llm_client
         )
         
         # Add to meeting data
@@ -2801,13 +2695,12 @@ def main():
 
         print(f"  Proceeding with brief generation for: {meeting_data['brand_name']}")
         
-        # 1. THE WRITER: Generate the Text Brief FIRST using the is_testing_mode flag
+        # 1. THE WRITER: Generate the Text Brief FIRST using Serper news context
         generated_brief = generate_brief_with_gemini(
             gemini_llm_client, 
             YOUR_DETAILED_PROMPT_TEMPLATE_GEMINI, 
             meeting_data, 
-            internal_nbh_data_for_brand_str, # <-- FIXED: Corrected variable allocation
-            is_testing_mode=is_testing_mode
+            internal_nbh_data_for_brand_str
         )
 
         # 2. IMAGE GENERATION (NOW LIVE FOR ALL MEETINGS)
