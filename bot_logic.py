@@ -1740,7 +1740,7 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
     visual_scene = visual_context.get("visual_scene", "modern lifestyle imagery")
     short_slogan = visual_context.get("short_slogan", "Exclusive Offer")
     
-    # UPGRADED PROMPT: Enforces strict aspect ratios, bans structural text labels, and segregates panel motifs.
+    # UPGRADED PROMPT: Restores the structured horizontal ACP gate board with exact dimensional layouts.
     image_prompt = f"""
     Create a highly realistic, professional vertical collage split into exactly three distinct horizontal panels stacked top-to-bottom, separated by thin, clean, solid white lines.
     
@@ -1751,13 +1751,12 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
     2. The only text allowed to appear in the entire image is the brand name '{brand_name}' and the slogan "{short_slogan}", placed naturally within the simulated advertisements.
     3. Distinct Environments: Each of the three panels must depict a completely unique physical space. Do not repeat or duplicate motifs across panels. For example, do not display a smartphone or hand in the top or middle panels, and do not display a gate or elevator in the bottom panel.
 
-    # PANEL 1 (TOP PANEL): OUTDOOR GATE BRANDING (NO PICTURE FRAMES)
-    - A wide-angle outdoor street-level shot showing the gated entrance of a residential apartment complex in India during the day.
-    - A black iron double gate (which splits open down the center) is visible across the paved driveway, with a security guard in a uniform standing nearby.
-    - Mounted cleanly on either the left leaf or the right leaf of the double gate is an outdoor weatherproof vinyl flex banner advertisement.
-    - PHYSICAL DESIGN & STYLE: The ad must be represented as a soft, printed PVC vinyl banner. It must have raw, clean cut-edges with no border, no wood frames, no glass covers, and no hard framing profiles. It should be stretched flat against the iron rods and tied cleanly at its corners with small, realistic metallic grommets. 
-    - POSITIONING & ASPECT RATIO: The banner must be a compact square (1:1 aspect ratio) or slightly vertical rectangle (4:3 aspect ratio). It must sit entirely on one side of the gate, leaving the vertical center split where the gate halves meet completely unobstructed and open.
-    - The vinyl banner displays the brand '{brand_name}' logo alongside the campaign visual scene ("{visual_scene}") and the slogan "{short_slogan}".
+    # PANEL 1 (TOP PANEL): OUTDOOR GATE BRANDING
+    - A street-level daylight view of a standard Indian apartment complex entrance with trees and residential buildings naturally in the background.
+    - The entrance features a black wrought-iron sliding gate positioned across the paved driveway, with a security guard in a uniform nearby.
+    - Mounted flat, clean, and directly onto the gate bars is a thin, rigid 4ft x 3ft horizontal ACP (Aluminium Composite Panel) board displaying the advertisement.
+    - PHYSICAL DESIGN & STYLE: The ad must be represented as a solid, flat horizontal metal-composite panel. It must be perfectly flat, sleek, and structurally fixed with no loose fabric, no hanging threads, no visible corner grommets, no thick wood frames, and no glass covers.
+    - The ACP board displays the brand '{brand_name}' logo alongside the campaign visual scene ("{visual_scene}") and the slogan "{short_slogan}" using primary brand colors ({colors}).
 
     # PANEL 2 (MIDDLE PANEL): ELEVATOR LIFT BRANDING
     - An interior view from inside a modern residential elevator cab.
