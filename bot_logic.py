@@ -1692,12 +1692,11 @@ def get_brand_visual_context(gemini_client, brand_name, industry, generated_brie
     Task:
     1. is_well_known: Set to true ONLY if '{brand_name}' is a widely recognized national or multinational brand with established guidelines, recognizable logos, and clear visual identifiers in India (e.g., McDonald's, KFC, Coca-Cola, Tanishq, Puma, Horlicks, Swiggy, Amazon). Set to false if the brand is highly localized, a minor regional outlet, or obscure to prevent generating hallucinated logos.
     2. primary_colors: Identify their exact 2 primary brand colors (e.g., McDonald's is "Golden Yellow and Crimson Red", Tanishq is "Deep Maroon and Gold").
-    3. THE PITCH / CREATIVE HOOK: Scan the provided brief carefully. Focus specifically on the real-world, active, and researched campaigns of the brand mentioned in the text (e.g., Coke's Halftime campaign, Pizza Hut's current regional menus, or Vinfast's EV community drive). Avoid generic themes; prioritize actual active projects or high-intent strategic solutions proposed in the text.
-    4. CREATE THE VISUAL SCENE: Combine the identified creative pitch/hook with premium, minimalist visual staging. Describe a clean, high-end scene centered on the proposed campaign's core concept. This scene description should represent a professional graphic design layout rather than an isolated portrait. Ensure it contains:
-       - Clear contextual elements of the brand's active marketing campaign.
-       - Clean, photorealistic presentation of the product.
-       - Realistic backgrounds matching modern Indian gated residential communities.
-       Ensure the description is highly specific to the proposed pitch, clean, authentic, and photorealistic.
+    3. THE PITCH / CREATIVE HOOK: Scan the provided brief carefully. Focus specifically on the real-world, active, and researched campaigns of the brand mentioned in the text (e.g., Coke's Halftime campaign, Pizza Hut's current regional menus, or Swiggy's grocery delivery service). Avoid generic themes; prioritize actual active projects or high-intent strategic solutions proposed in the text.
+    4. CREATE THE VISUAL SCENE: Combine the identified creative campaign/theme with premium, minimalist visual staging. 
+       - IMPORTANT EXCLUSION: If the brief's creative hook or solutions propose a physical on-ground setup (such as a physical canopy, kiosk, sampling table, delivery truck, physical promotional stand, or physical booth), DO NOT depict these physical structures inside the static ad panels. The ad panels (Gate, Lift, and App) represent static graphic and print ad campaigns, not photos of live event stalls.
+       - Instead, describe a simple, clean, brand-specific commercial advertisement design centered on products or standard service/lifestyle imagery (e.g., for Swiggy Instamart, display a beautifully styled arrangement of fresh, high-quality groceries or standard brand delivery bags with modern graphic typography). 
+       - Keep the layout photorealistic, premium, and focused directly on standard brand-specific assets.
     5. CREATE A SLOGAN: Extract the exact slogan proposed in the brief's creative hook, or draft a short, impactful 2-to-3 word slogan that matches the strategic pitch (e.g., "Warmth, Shared", "Halftime Refresh"). Do not invent long sentences.
     
     Return ONLY a valid JSON object:
@@ -1740,7 +1739,7 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
     visual_scene = visual_context.get("visual_scene", "modern lifestyle imagery")
     short_slogan = visual_context.get("short_slogan", "Exclusive Offer")
     
-    # UPGRADED PROMPT: Restores the structured horizontal ACP gate board with exact dimensional layouts.
+    # UPGRADED PROMPT: Restores the structured horizontal ACP gate board and prevents rendering physical event setups inside static ads.
     image_prompt = f"""
     Create a highly realistic, professional vertical collage split into exactly three distinct horizontal panels stacked top-to-bottom, separated by thin, clean, solid white lines.
     
@@ -1750,6 +1749,7 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
     1. DO NOT write any structural labels, section headers, or metadata text anywhere on or between the panels. Text such as "Gate Banner", "Lift Banner", "PAC", "In-App Ad", "Top Section", "Middle Section", "Bottom Section", or "Mockup" must NEVER be written or rendered in the image.
     2. The only text allowed to appear in the entire image is the brand name '{brand_name}' and the slogan "{short_slogan}", placed naturally within the simulated advertisements.
     3. Distinct Environments: Each of the three panels must depict a completely unique physical space. Do not repeat or duplicate motifs across panels. For example, do not display a smartphone or hand in the top or middle panels, and do not display a gate or elevator in the bottom panel.
+    4. NO PHYSICAL EVENT STRUCTURES: Under no circumstances should any panel show physical event stands, physical canopies, kiosks, promotional tents, sampling tables, or booths. Banners and posters must show only clean, flat, flat-designed product-focused or lifestyle-focused graphic advertisements.
 
     # PANEL 1 (TOP PANEL): OUTDOOR GATE BRANDING
     - A street-level daylight view of a standard Indian apartment complex entrance with trees and residential buildings naturally in the background.
