@@ -1722,7 +1722,7 @@ def get_brand_visual_context(gemini_client, brand_name, industry, generated_brie
 
 def generate_creative_with_gemini_image(gemini_client, brand_name, industry, visual_context):
     """
-    Acts as the Photographer/Artist: Uses 'gemini-3-pro-image-preview' to render
+    Acts as the Photographer/Artist: Uses 'gemini-3.1-flash-image' to render
     photorealistic mockups that visually display the sales pitch extracted from the brief.
     Ensures proper environmental scaling and a realistic Indian society setting.
     """
@@ -1781,11 +1781,11 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
     - No gates, elevator walls, or outdoor landscapes are visible in this panel.
     """
     
-    print(f"  🎨 Generating high-fidelity visual creative for {brand_name} using gemini-3-pro-image-preview...")
+    print(f"  🎨 Generating high-fidelity visual creative for {brand_name} using gemini-3.1-flash-image...")
     
     try:
         response = gemini_client.models.generate_content(
-            model="gemini-3-pro-image-preview",
+            model="gemini-3.1-flash-image",
             contents=image_prompt,
             config=types.GenerateContentConfig(
                 response_modalities=["IMAGE", "TEXT"]
@@ -1811,7 +1811,7 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
         print(f"   No image data found in response for {brand_name}.")
         return None
     except Exception as e:
-        print(f"   Error generating image with gemini-3-pro-image-preview: {e}")
+        print(f"   Error generating image with gemini-3.1-flash-image: {e}")
         return None
 # --- Email Sending ---
 def create_email_message_with_image(sender, to_emails_list, subject, message_text_html, image_bytes=None):
