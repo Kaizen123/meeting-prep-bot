@@ -59,23 +59,29 @@ TOKEN_FILE_PREFIX = 'token_brandvmeet' # Will generate token_brandvmeet_calendar
 
 import requests # Serper.dev
 
-# For Gemini API
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") # Set this environment variable
-SERPER_API_KEY = os.getenv("SERPER_API_KEY") # <-- NEW: Set this in your environment config
-
 # Google Drive Folder ID containing NBH data
 NBH_GDRIVE_FOLDER_ID = os.getenv("NBH_GDRIVE_FOLDER_ID") # Set env var or replace placeholder
 
+# For Gemini API
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") 
+
+# Load and sanitize Serper API Key automatically to strip trailing newlines, spaces, or accidental quotes
+RAW_SERPER_KEY = os.getenv("SERPER_API_KEY", "")
+if RAW_SERPER_KEY:
+    SERPER_API_KEY = str(RAW_SERPER_KEY).strip().replace('"', '').replace("'", "")
+else:
+    SERPER_API_KEY = None
+
 # =====================================================================
-# NEW HELPER: SERPER.DEV SEARCH API CALL
+# SANITIZED SERPER.DEV SEARCH API CALL
 # =====================================================================
 def execute_serper_search_api(query, num_results=5):
     """
     Executes a Google search via Serper.dev pointing to India region.
-    Returns clean organic title, link, and snippet text.
+    Cleans incoming inputs and safely logs request errors to help debug authentication issues.
     """
     if not SERPER_API_KEY:
-        print("  ⚠️ [SERPER] API Key is missing. Skipping search.")
+        print("  ⚠️ [SERPER] API Key is missing or empty. Skipping search.")
         return "Search results unavailable: API Key missing."
         
     url = "https://google.serper.dev/search"
@@ -84,6 +90,7 @@ def execute_serper_search_api(query, num_results=5):
         "num": num_results,
         "gl": "in" # Constrain searches to India region
     })
+    
     headers = {
         'X-API-KEY': SERPER_API_KEY,
         'Content-Type': 'application/json'
@@ -91,6 +98,7 @@ def execute_serper_search_api(query, num_results=5):
     
     try:
         response = requests.post(url, headers=headers, data=payload, timeout=10)
+        
         if response.status_code == 200:
             organic_results = response.json().get("organic", [])
             if not organic_results:
@@ -103,10 +111,16 @@ def execute_serper_search_api(query, num_results=5):
                 snippet = res.get("snippet", "")
                 formatted.append(f"[{i}] {title}\nURL: {link}\nSnippet: {snippet}\n")
             return "\n".join(formatted)
+            
         else:
+            # Descriptive log output to immediately identify key issues in the action console
+            print(f"  ⚠️ [SERPER] API Error. HTTP Status: {response.status_code} | Details: {response.text}")
             return f"Search failed. Code: {response.status_code}"
+            
     except Exception as e:
+        print(f"  ⚠️ [SERPER] Network or connection error: {e}")
         return f"Search network error: {e}"
+
 
 AGENT_EMAIL = "brand.vmeet@nobroker.in" # Email of the agent account
 ADMIN_EMAIL_FOR_NOTIFICATIONS = "ajay.saini@nobroker.in" # REPLACE with your actual email
