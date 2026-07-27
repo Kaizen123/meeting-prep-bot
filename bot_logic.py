@@ -1737,7 +1737,8 @@ def get_brand_visual_context(gemini_client, brand_name, industry, generated_brie
 def generate_creative_with_gemini_image(gemini_client, brand_name, industry, visual_context):
     """
     Generates a professional 3-panel side-by-side marketing funnel mockup collage 
-    with premium aesthetic grading, refined text fonts, and polished conversion copywriting.
+    with premium aesthetic grading, a naturally-scaled gate banner, and clean overlays.
+    All header text is omitted from the canvas to be handled in external HTML.
     """
     if not visual_context:
         print(f"  Skipping image generation for {brand_name}: Visual context was not extracted.")
@@ -1754,22 +1755,19 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
     
     image_prompt = f"""
     Create a highly professional, commercial-grade horizontal mockup collage with a clean, symmetric aspect ratio. 
-    The layout features a white top header banner, followed by three vertical columns positioned side-by-side, separated by thin, clean, solid white lines.
+    The collage consists exactly of three vertical panels (columns) positioned side-by-side, separated by thin, clean, solid white lines.
+    
+    CRITICAL STRUCTURE RULE: No top banners, title bars, headers, or plain white text zones are permitted at the top of the image frame. The image must begin directly with the three panels.
 
     # OVERALL STYLE, COLOR & AESTHETIC:
-    - Consistent professional color grading and high-end editorial tone across all three panels.
+    - Consistent professional color grading and editorial tone across all three panels.
     - Soft, subtle depth-of-field background blurs to focus viewer attention on ad placements.
     - Real-world physics: clean drop-shadows under the poster frames and panels to convey realistic depth.
     - The palette strictly reflects the brand's primary colors ({colors}).
 
-    # TOP HEADER BANNER:
-    - Clean, plain white horizontal banner spanning the full width.
-    - Header text centered in an elegant, modern, high-end sans-serif font (such as Helvetica Neue or clean Inter style), rendered in a refined dark charcoal gray (#333333) for a premium look:
-      "From Visibility to Conversion — Powered by NoBrokerHood"
-
     # PANEL 1 (LEFT COLUMN): OUTDOOR RESIDENTIAL GATEWAY (Awareness)
-    - ENVIRONMENT: Street-level daylight view of a premium Indian apartment complex gate with residential blocks softly blurred in the background.
-    - MEDIA: A thin, rigid horizontal ACP ad panel mounted flat and secure on the gate bars. Realistic drop shadow on the mounting.
+    - ENVIRONMENT: Street-level daylight view of a premium Indian apartment complex entrance with a standard black sliding iron residential gate. High-rise buildings are visible in the soft-focus background.
+    - MEDIA SETUP: A standard-sized horizontal rectangular banner (proportional scale, approximately 4 feet wide by 2.5 feet tall) is mounted flat and cleanly centered horizontally on the black gate bars. It must look naturally scaled and realistic, leaving significant portions of the gate's black bars visible above, below, and on the sides (not oversized, and not covering the full height or width of the gate).
     - ARTWORK: Displays '{brand_name}' logo, the campaign scene ("{visual_scene}"), and slogan "{short_slogan}".
     - HUMAN INTERACTION: A modern Indian resident walking past the gate, caught in a natural, candid moment looking directly at the advertisement.
     - CAPTION: White text centered in a dark, semi-transparent horizontal strip at the bottom:
@@ -1919,15 +1917,17 @@ def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_
     if creative_image_bytes:
         print("  📸 Attaching image to email HTML...")
         creative_html = """
-        <div style="margin-bottom: 30px; background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 25px; border-radius: 8px;">
-            <h3 style="color: #2b6cb0; font-size: 18px; text-transform: uppercase; margin-top: 0; border-bottom: 2px solid #bee3f8; padding-bottom: 10px;">
-                💡 Thought-Starters: Creatives Based on Current Market Insights
-            </h3>
-            <p style="font-size: 14px; color: #4a5568; margin-bottom: 20px;">
-                <i>A suggested 3-in-1 visual pitch (Gate, Lift, and App) based on the brand's current live campaigns and colors:</i>
-            </p>
+        <div style="margin-bottom: 30px; background-color: #ffffff; border: 1px solid #e2e8f0; padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+            <div style="text-align: center; margin-bottom: 25px; border-bottom: 1px solid #f0f4f8; padding-bottom: 20px;">
+                <h2 style="color: #2d3748; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 20px; font-weight: 600; margin: 0 0 8px 0; letter-spacing: -0.2px;">
+                    From Visibility to Conversion — Powered by NoBrokerHood
+                </h2>
+                <p style="font-size: 13px; color: #718096; margin: 0; font-style: italic;">
+                    A suggested 3-in-1 visual pitch (Gate, Lift, and App) based on the brand's current live campaigns and colors:
+                </p>
+            </div>
             <center>
-                <img src="cid:creative_image" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 6px 12px rgba(0,0,0,0.15);" alt="Brand Creative">
+                <img src="cid:creative_image" style="max-width: 100%; height: auto; border-radius: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.08);" alt="Brand Creative">
             </center>
         </div>
         """
