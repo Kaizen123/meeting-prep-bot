@@ -1902,13 +1902,24 @@ def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_
         f'</div>'
     )
 
-    # Search for the Brand Attendees line in the markdown and insert the Event ID box directly beneath it
+    # --- NEW: Build the Top 100 Sites Orange Highlight Box ---
+    top_sites_url = "https://docs.google.com/spreadsheets/d/1NiYih9q_Gb-D6lCUjd08eDrsVAAJFqo6SRkBk8vzgrI/edit?gid=0#gid=0"
+    top_sites_box_html = (
+        f'<div class="top-sites-box">'
+        f'Sample list of Top 100 Sites: <a href="{top_sites_url}" class="top-sites-link" target="_blank">Click Here to View Sheet</a>'
+        f'</div>'
+    )
+
+    # Stack both boxes cleanly
+    combined_boxes_html = f"{event_id_box_html}<br>{top_sites_box_html}"
+
+    # Search for the Brand Attendees line in the markdown and insert the combined HTML boxes directly beneath it
     brand_attendees_pattern = re.compile(r'(Brand Attendees\s*:.*?)(\n|$)', re.IGNORECASE)
     if brand_attendees_pattern.search(brief_content):
-        modified_brief_content = brand_attendees_pattern.sub(rf'\1\n\n{event_id_box_html}\n', brief_content)
+        modified_brief_content = brand_attendees_pattern.sub(rf'\1\n\n{combined_boxes_html}\n', brief_content)
     else:
         # Prepend to the top of the brief as a fallback if the pattern is not found
-        modified_brief_content = f"{event_id_box_html}\n\n{brief_content}"
+        modified_brief_content = f"{combined_boxes_html}\n\n{brief_content}"
 
     html_brief_content = markdown.markdown(modified_brief_content)
     
@@ -1948,7 +1959,7 @@ def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_
         .footer {{ margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #718096; }}
         .highlight-box {{ background-color: #f0f8ff; border: 1px solid #bee3f8; border-radius: 6px; padding: 15px 20px; margin-top: 30px; margin-bottom: 20px; }}
         
-        /* NEW: Soft Google Yellow Event ID Box Styles */
+        /* Soft Google Yellow Event ID Box Styles */
         .event-id-box {{
             background-color: #fef7e0;
             border: 1px solid #fbbc04;
@@ -1956,7 +1967,7 @@ def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_
             border-radius: 6px;
             padding: 10px 16px;
             margin-top: 15px;
-            margin-bottom: 20px;
+            margin-bottom: 8px;
             display: inline-block;
             font-size: 14px;
             font-weight: bold;
@@ -1971,6 +1982,26 @@ def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_
             border-radius: 4px;
             margin-left: 5px;
             color: #3c4043;
+        }}
+
+        /* NEW: Orange Highlight Box for Top 100 Sites */
+        .top-sites-box {{
+            background-color: #fff5eb;
+            border: 1px solid #ff9800;
+            color: #d84315;
+            border-radius: 6px;
+            padding: 10px 16px;
+            margin-top: 5px;
+            margin-bottom: 20px;
+            display: inline-block;
+            font-size: 14px;
+            font-weight: bold;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }}
+        .top-sites-link {{
+            color: #0066cc;
+            text-decoration: underline;
+            margin-left: 5px;
         }}
     </style>
     </head>
