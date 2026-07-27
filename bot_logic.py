@@ -1737,8 +1737,7 @@ def get_brand_visual_context(gemini_client, brand_name, industry, generated_brie
 def generate_creative_with_gemini_image(gemini_client, brand_name, industry, visual_context):
     """
     Generates a professional 3-panel side-by-side marketing funnel mockup collage 
-    with refined aesthetic guidelines, featuring a resident interacting with the media 
-    and polished description labels at the bottom.
+    with premium aesthetic grading, refined text fonts, and polished conversion copywriting.
     """
     if not visual_context:
         print(f"  Skipping image generation for {brand_name}: Visual context was not extracted.")
@@ -1754,44 +1753,42 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
     short_slogan = visual_context.get("short_slogan", "Exclusive Offer")
     
     image_prompt = f"""
-    Create a highly professional, commercial-grade horizontal collage layout with a clean aspect ratio. 
-    The layout must consist of a clean white top header banner, followed by exactly three vertical panels (columns) positioned side-by-side, separated by thin, clean, solid white vertical borders.
+    Create a highly professional, commercial-grade horizontal mockup collage with a clean, symmetric aspect ratio. 
+    The layout features a white top header banner, followed by three vertical columns positioned side-by-side, separated by thin, clean, solid white lines.
 
-    # OVERALL STYLE & AESTHETIC Guidelines:
-    - High-fidelity commercial photography captured in soft, natural daylight.
-    - Photorealistic textures throughout: brushed metallic finishes, premium matte paper, and reflective smartphone glass.
-    - A professional color palette matching the brand's primary colors ({colors}).
-    - Human interaction must look realistic, natural, and candid, avoiding direct eye contact with the camera to keep the focus on the advertising medium.
+    # OVERALL STYLE, COLOR & AESTHETIC:
+    - Consistent professional color grading and high-end editorial tone across all three panels.
+    - Soft, subtle depth-of-field background blurs to focus viewer attention on ad placements.
+    - Real-world physics: clean drop-shadows under the poster frames and panels to convey realistic depth.
+    - The palette strictly reflects the brand's primary colors ({colors}).
 
-    # TOP HEADER BANNER (Span across the entire width of the collage):
-    - A clean, elegant white strip at the very top.
-    - Displays the corporate branding text centered in a highly polished, clean sans-serif typeface:
-      "This is how we at NoBrokerHood increase your brand's growth"
-    - An optional small, clean NoBrokerHood logo icon next to the text.
+    # TOP HEADER BANNER:
+    - Clean, plain white horizontal banner spanning the full width.
+    - Header text centered in an elegant, modern, high-end sans-serif font (such as Helvetica Neue or clean Inter style), rendered in a refined dark charcoal gray (#333333) for a premium look:
+      "From Visibility to Conversion — Powered by NoBrokerHood"
 
-    # PANEL 1 (LEFT COLUMN): OUTDOOR RESIDENTIAL GATEWAY (Awareness/Discovery)
-    - ENVIRONMENT: A realistic outdoor daytime view of the entrance gateway to a premium Indian residential society. Modern high-rise apartment buildings and green trees are visible in the soft-focus background.
-    - MEDIA SETUP: A horizontal ACP (Aluminium Composite Panel) board is mounted flat and secure against the gate structure. No loose fabrics or strings.
-    - ARTWORK: The panel ad features the '{brand_name}' logo, the campaign scene ("{visual_scene}"), and the slogan "{short_slogan}".
-    - HUMAN INTERACTION: A modern Indian resident (a man dressed in clean, smart-casual attire) is photographed walking past the gate, naturally turning his head to look at the advertisement board.
-    - CAPTION: A dark, semi-transparent horizontal overlay strip spans the bottom of this column with the clean, white sans-serif text:
-      "Capturing primary attention at the gateway of premium societies"
+    # PANEL 1 (LEFT COLUMN): OUTDOOR RESIDENTIAL GATEWAY (Awareness)
+    - ENVIRONMENT: Street-level daylight view of a premium Indian apartment complex gate with residential blocks softly blurred in the background.
+    - MEDIA: A thin, rigid horizontal ACP ad panel mounted flat and secure on the gate bars. Realistic drop shadow on the mounting.
+    - ARTWORK: Displays '{brand_name}' logo, the campaign scene ("{visual_scene}"), and slogan "{short_slogan}".
+    - HUMAN INTERACTION: A modern Indian resident walking past the gate, caught in a natural, candid moment looking directly at the advertisement.
+    - CAPTION: White text centered in a dark, semi-transparent horizontal strip at the bottom:
+      "When residents enter, your brand is discovered."
 
-    # PANEL 2 (MIDDLE COLUMN): CAPTIVE ELEVATOR CABIN (Deep Recall/Retention)
-    - ENVIRONMENT: A realistic interior perspective from within a modern, premium passenger elevator cab. The walls are made of high-quality brushed stainless steel panels.
-    - MEDIA SETUP: A vertical advertisement poster is mounted flat on the steel wall, framed within a sleek, thin anodized aluminum poster frame.
-    - ARTWORK: The vertical poster displays the '{brand_name}' campaign scene ("{visual_scene}"), logo, and "{short_slogan}" layout.
-    - HUMAN INTERACTION: The same Indian resident is standing inside the elevator, leaning slightly, looking naturally at the framed wall advertisement.
-    - CAPTION: A dark, semi-transparent horizontal overlay strip spans the bottom of this column with the clean, white sans-serif text:
-      "Maximizing recall during captive, high-frequency elevator transits"
+    # PANEL 2 (MIDDLE COLUMN): CAPTIVE ELEVATOR CABIN (Recall)
+    - ENVIRONMENT: Interior of a sleek passenger lift cabin with modern brushed silver steel walls.
+    - MEDIA: A vertical poster mounted inside a thin, clean, minimalist aluminum snap frame with soft drop shadows on the wall panel.
+    - ARTWORK: Vertical layout of '{brand_name}' campaign scene ("{visual_scene}"), logo, and slogan "{short_slogan}".
+    - HUMAN INTERACTION: The same resident standing naturally in the lift, looking at the poster.
+    - CAPTION: White text centered in a dark, semi-transparent horizontal strip at the bottom:
+      "Capturing undivided attention during high-focus transit moments."
 
-    # PANEL 3 (RIGHT COLUMN): NATIVE MOBILE IN-APP PLACEMENT (Immediate Action/Conversion)
-    - ENVIRONMENT: A close-up, shallow depth-of-field shot focusing on a physical smartphone screen held naturally in a person's hand. The background shows a soft-blurred, cozy residential living room.
-    - MEDIA SETUP: The phone screen displays the dark-themed NoBrokerHood mobile app UI interface.
-    - APP UI DETAILS: A clean, white delivery pre-approval pop-up card sits near the top, with a green header showing a checkmark and "Delivery Pre-Approved". Directly below this card, a native, high-contrast, full-width vertical banner advertisement for '{brand_name}' fills the lower portion of the screen.
-    - ARTWORK: The mobile banner ad natively renders the '{brand_name}' branding, visual scene ("{visual_scene}"), and the slogan "{short_slogan}".
-    - CAPTION: A dark, semi-transparent horizontal overlay strip spans the bottom of this column with the clean, white sans-serif text:
-      "Triggering immediate conversions at the final point of purchase intent"
+    # PANEL 3 (RIGHT COLUMN): NATIVE MOBILE IN-APP PLACEMENT (Conversion)
+    - ENVIRONMENT: Premium close-up photo of a modern smartphone held in a hand, against a softly blurred home background.
+    - MEDIA: Smartphone screen displaying a dark-themed NoBrokerHood application interface.
+    - UI DETAILS: A clean white delivery pre-approval card floats at the top with a green header. Directly below is a full-width vertical banner ad for '{brand_name}' showing the campaign scene ("{visual_scene}"), logo, and slogan "{short_slogan}".
+    - CAPTION: White text centered in a dark, semi-transparent horizontal strip at the bottom:
+      "Bringing your brand back when residents are ready to order."
     """
     
     print(f"  🎨 Generating high-fidelity visual creative for {brand_name} using gemini-3-pro-image-preview...")
