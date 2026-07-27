@@ -33,6 +33,7 @@ jobs:
         echo '${{ secrets.GOOGLE_TOKEN_DRIVE_JSON }}' > drive_token.json
         echo '${{ secrets.GOOGLE_TOKEN_SHEETS_JSON }}' > sheets_token.json
         echo '${{ secrets.GOOGLE_TOKEN_DOCS_JSON }}' > docs_token.json
+        echo '${{ secrets.FLOW_AUTH_STATE_JSON_CONTENT }}' > flow_auth_state.json
 
     - name: Build and Push Docker Image
       run: |
