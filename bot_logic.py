@@ -1736,9 +1736,9 @@ def get_brand_visual_context(gemini_client, brand_name, industry, generated_brie
 
 def generate_creative_with_gemini_image(gemini_client, brand_name, industry, visual_context):
     """
-    Acts as the Photographer/Artist: Uses 'gemini-3-pro-image-preview' to render
-    photorealistic mockups that visually display the sales pitch extracted from the brief.
-    Ensures proper environmental scaling and a realistic Indian society setting.
+    Generates a professional 3-panel side-by-side marketing funnel mockup collage 
+    with refined aesthetic guidelines, featuring a resident interacting with the media 
+    and polished description labels at the bottom.
     """
     if not visual_context:
         print(f"  Skipping image generation for {brand_name}: Visual context was not extracted.")
@@ -1753,46 +1753,45 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
     visual_scene = visual_context.get("visual_scene", "modern lifestyle imagery")
     short_slogan = visual_context.get("short_slogan", "Exclusive Offer")
     
-    # UPGRADED PROMPT: Restores the structured horizontal ACP gate board and prevents rendering physical event setups inside static ads.
     image_prompt = f"""
-    Create a highly realistic, professional vertical collage split into exactly three distinct horizontal panels stacked top-to-bottom, separated by thin, clean, solid white lines.
-    
-    Overall Style: Professional corporate mockup catalog photography. Captured in natural, diffused daylight with soft, realistic shadows. Clean composition focusing on authentic physical textures (brushed steel, wrought iron, printed paper, and clean mobile screen glass).
-    
-    # CRITICAL DESIGN & TEXT RULES:
-    1. DO NOT write any structural labels, section headers, or metadata text anywhere on or between the panels. Text such as "Gate Banner", "Lift Banner", "PAC", "In-App Ad", "Top Section", "Middle Section", "Bottom Section", or "Mockup" must NEVER be written or rendered in the image.
-    2. The only text allowed to appear in the entire image is the brand name '{brand_name}' and the slogan "{short_slogan}", placed naturally within the simulated advertisements.
-    3. Distinct Environments: Each of the three panels must depict a completely unique physical space. Do not repeat or duplicate motifs across panels. For example, do not display a smartphone or hand in the top or middle panels, and do not display a gate or elevator in the bottom panel.
-    4. NO PHYSICAL EVENT STRUCTURES: Under no circumstances should any panel show physical event stands, physical canopies, kiosks, promotional tents, sampling tables, or booths. Banners and posters must show only clean, flat, flat-designed product-focused or lifestyle-focused graphic advertisements.
+    Create a highly professional, commercial-grade horizontal collage layout with a clean aspect ratio. 
+    The layout must consist of a clean white top header banner, followed by exactly three vertical panels (columns) positioned side-by-side, separated by thin, clean, solid white vertical borders.
 
-    # PANEL 1 (TOP PANEL): OUTDOOR GATE BRANDING
-    - A street-level daylight view of a standard Indian apartment complex entrance with trees and residential buildings naturally in the background.
-    - The entrance features a black wrought-iron sliding gate positioned across the paved driveway, with a security guard in a uniform nearby.
-    - Mounted flat, clean, and directly onto the gate bars is a thin, rigid 4ft x 3ft horizontal ACP (Aluminium Composite Panel) board displaying the advertisement.
-    - PHYSICAL DESIGN & STYLE: The ad must be represented as a solid, flat horizontal metal-composite panel. It must be perfectly flat, sleek, and structurally fixed with no loose fabric, no hanging threads, no visible corner grommets, no thick wood frames, and no glass covers.
-    - The ACP board displays the brand '{brand_name}' logo alongside the campaign visual scene ("{visual_scene}") and the slogan "{short_slogan}" using primary brand colors ({colors}).
+    # OVERALL STYLE & AESTHETIC Guidelines:
+    - High-fidelity commercial photography captured in soft, natural daylight.
+    - Photorealistic textures throughout: brushed metallic finishes, premium matte paper, and reflective smartphone glass.
+    - A professional color palette matching the brand's primary colors ({colors}).
+    - Human interaction must look realistic, natural, and candid, avoiding direct eye contact with the camera to keep the focus on the advertising medium.
 
-    # PANEL 2 (MIDDLE PANEL): ELEVATOR LIFT BRANDING
-    - An interior view from inside a modern residential elevator cab.
-    - The elevator walls are clean, premium plates of silver brushed-steel.
-    - Framed flat on the steel wall is an ad poster inside a slim, commercial anodized aluminum snap-frame with very narrow borders.
-    - The poster inside is a high-quality matte paper print displaying a vertical commercial layout for '{brand_name}' with the campaign visual scene ("{visual_scene}") and the slogan "{short_slogan}".
-    - Captured from a natural, slightly angled perspective showing subtle metallic reflections. No smartphones, hands, or outdoor gate elements are visible in this panel.
+    # TOP HEADER BANNER (Span across the entire width of the collage):
+    - A clean, elegant white strip at the very top.
+    - Displays the corporate branding text centered in a highly polished, clean sans-serif typeface:
+      "This is how we at NoBrokerHood increase your brand's growth"
+    - An optional small, clean NoBrokerHood logo icon next to the text.
 
-    # PANEL 3 (BOTTOM PANEL): DIGITAL IN-APP MOBILE MOCKUP (REAL PRE-APPROVAL CARD LAYOUT)
-    - A close-up focus shot of a physical smartphone screen held naturally in a human hand against a soft-focus, blurred indoor home living room background.
-    - The smartphone screen displays the native delivery pre-approval card layout of the NoBrokerHood app over a clean, dark charcoal gray background.
-    - THE CLOSING ICON: A small, minimalist gray "X" close icon sits near the top-right corner of the dark screen.
-    - FLOATING PRE-APPROVAL SLIP (AT THE TOP): A prominent, horizontal white card with cleanly rounded corners floats near the top of the viewport.
-      - At the top of this white card is a solid green horizontal header bar with the text "✔ Delivery Pre-Approved" in white alongside a small white checkmark circle icon.
-      - Inside the body of this white card (directly beneath the green header bar), a small red and gray delivery scooter graphic is on the left, with the bold black text "Delivery" and a smaller gray date stamp "16 Jun '26 11:31 - 16 Jun '26 12:31" displayed to its right.
-    - FULL-WIDTH VERTICAL AD BANNER: Positioned directly beneath the floating pre-approval card is a large, tall, vertically-oriented rectangular advertisement banner (aspect ratio 2:3). 
-      - The banner must stretch cleanly to the left and right edges of the dark phone screen viewport, filling the entire lower two-thirds of the screen.
-      - The ad graphics, including '{brand_name}' logo, the campaign visual scene ("{visual_scene}"), and the slogan "{short_slogan}", must be natively integrated directly into this tall, full-bleed vertical banner's graphic design.
-      - STRICT EXCLUSION: No surrounding borders, frames, margins, or padding around the advertisement banner. It must not look like a floating square post.
-    - AD SYSTEM LABELS: A small, clean text label displaying "AD" is positioned at the bottom right corner of the advertisement. The bottom system footer of the phone screen displays the text "Why am I seeing this ad?" along with a clean mobile application navigation bar.
-    - STRICT EXCLUSION: No social media post layouts. No heart icons, comment bubbles, share arrows, user handles, or round profile picture elements are allowed anywhere on the screen.
-    - No gates, elevator walls, or outdoor landscapes are visible in this panel.
+    # PANEL 1 (LEFT COLUMN): OUTDOOR RESIDENTIAL GATEWAY (Awareness/Discovery)
+    - ENVIRONMENT: A realistic outdoor daytime view of the entrance gateway to a premium Indian residential society. Modern high-rise apartment buildings and green trees are visible in the soft-focus background.
+    - MEDIA SETUP: A horizontal ACP (Aluminium Composite Panel) board is mounted flat and secure against the gate structure. No loose fabrics or strings.
+    - ARTWORK: The panel ad features the '{brand_name}' logo, the campaign scene ("{visual_scene}"), and the slogan "{short_slogan}".
+    - HUMAN INTERACTION: A modern Indian resident (a man dressed in clean, smart-casual attire) is photographed walking past the gate, naturally turning his head to look at the advertisement board.
+    - CAPTION: A dark, semi-transparent horizontal overlay strip spans the bottom of this column with the clean, white sans-serif text:
+      "Capturing primary attention at the gateway of premium societies"
+
+    # PANEL 2 (MIDDLE COLUMN): CAPTIVE ELEVATOR CABIN (Deep Recall/Retention)
+    - ENVIRONMENT: A realistic interior perspective from within a modern, premium passenger elevator cab. The walls are made of high-quality brushed stainless steel panels.
+    - MEDIA SETUP: A vertical advertisement poster is mounted flat on the steel wall, framed within a sleek, thin anodized aluminum poster frame.
+    - ARTWORK: The vertical poster displays the '{brand_name}' campaign scene ("{visual_scene}"), logo, and "{short_slogan}" layout.
+    - HUMAN INTERACTION: The same Indian resident is standing inside the elevator, leaning slightly, looking naturally at the framed wall advertisement.
+    - CAPTION: A dark, semi-transparent horizontal overlay strip spans the bottom of this column with the clean, white sans-serif text:
+      "Maximizing recall during captive, high-frequency elevator transits"
+
+    # PANEL 3 (RIGHT COLUMN): NATIVE MOBILE IN-APP PLACEMENT (Immediate Action/Conversion)
+    - ENVIRONMENT: A close-up, shallow depth-of-field shot focusing on a physical smartphone screen held naturally in a person's hand. The background shows a soft-blurred, cozy residential living room.
+    - MEDIA SETUP: The phone screen displays the dark-themed NoBrokerHood mobile app UI interface.
+    - APP UI DETAILS: A clean, white delivery pre-approval pop-up card sits near the top, with a green header showing a checkmark and "Delivery Pre-Approved". Directly below this card, a native, high-contrast, full-width vertical banner advertisement for '{brand_name}' fills the lower portion of the screen.
+    - ARTWORK: The mobile banner ad natively renders the '{brand_name}' branding, visual scene ("{visual_scene}"), and the slogan "{short_slogan}".
+    - CAPTION: A dark, semi-transparent horizontal overlay strip spans the bottom of this column with the clean, white sans-serif text:
+      "Triggering immediate conversions at the final point of purchase intent"
     """
     
     print(f"  🎨 Generating high-fidelity visual creative for {brand_name} using gemini-3-pro-image-preview...")
@@ -1811,11 +1810,9 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
                 if part.inline_data and part.inline_data.mime_type.startswith("image/"):
                     raw_data = part.inline_data.data
                     
-                    # Safety decoding validation
                     if isinstance(raw_data, str):
                         raw_data = base64.b64decode(raw_data)
                     elif isinstance(raw_data, bytes):
-                        # Ensure bytes are decoded back to raw binary jpeg data
                         if not raw_data.startswith(b'\xff\xd8\xff'):
                             raw_data = base64.b64decode(raw_data)
                     
@@ -1828,8 +1825,8 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
         print(f"   Error generating image with gemini-3-pro-image-preview: {e}")
         return None
 # --- Email Sending ---
-def create_email_message_with_image(sender, to_emails_list, subject, message_text_html, image_bytes=None):
-    """Creates an email message using the proven EmailMessage logic from outbound script."""
+def create_email_message_with_image(sender, to_emails_list, subject, message_text_html, image_bytes=None, brand_name=None):
+    """Creates an email message, assigning a clear, custom filename to attachments to prevent 'noname' display."""
     msg = EmailMessage()
     msg["To"] = ", ".join(to_emails_list)
     msg["From"] = sender
@@ -1841,15 +1838,20 @@ def create_email_message_with_image(sender, to_emails_list, subject, message_tex
     # Add the HTML version
     msg.add_alternative(message_text_html, subtype="html")
 
-    # PROVEN LOGIC: Attach and embed Mockup Image using add_related
+    # Attach and embed Mockup Image using add_related with custom filename
     if image_bytes:
         html_part = msg.get_body(preferencelist=("html",))
         if html_part:
+            # Assign a dynamic filename instead of leaving it default/empty
+            safe_brand_name = "".join([c if c.isalnum() else "_" for c in (brand_name or "Brand")])
+            attachment_filename = f"{safe_brand_name}_X_NoBrokerHood.jpg"
+            
             html_part.add_related(
                 image_bytes,
                 maintype="image",
                 subtype="jpeg",
-                cid="creative_image"
+                cid="creative_image",
+                filename=attachment_filename
             )
 
     raw_message = base64.urlsafe_b64encode(msg.as_bytes()).decode()
@@ -2005,7 +2007,8 @@ def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_
         to_emails_list=nbh_recipient_emails,
         subject=email_subject,
         message_text_html=email_body_html,
-        image_bytes=creative_image_bytes
+        image_bytes=creative_image_bytes,
+        brand_name=meeting_data.get('brand_name') # Added parameter
     )
     print(f"  FINAL CHECK: Sending styled brief for '{meeting_data['title']}' TO: {nbh_recipient_emails}")
     send_gmail_message(gmail_service, 'me', email_message)
