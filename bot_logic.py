@@ -1743,16 +1743,16 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
       for instant, reliable production runs.
     - ATTEMPT 2 (Secondary / Testing): Falls back to Playwright browser automation (Google Flow) 
       if the API limits are exceeded or fail.
-    Returns: Tuple of (raw_data, source_tag)
+    Returns: raw_data bytes (or None)
     """
     if not visual_context:
         print(f"  Skipping image generation for {brand_name}: Visual context was not extracted.")
-        return None, "Bypassed"
+        return None
 
     # Strict screening check to prevent generating hallucinated logos for obscure brands
     if not visual_context.get("is_well_known"):
         print(f"  Skipping image generation for {brand_name}: Brand designated as regional or obscure to avoid visual hallucination.")
-        return None, "Bypassed"
+        return None
         
     colors = visual_context.get("primary_colors", "vibrant colors")
     visual_scene = visual_context.get("visual_scene", "modern lifestyle imagery")
@@ -1824,11 +1824,10 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
                     
                     print(f"  ✅ Primary API image generation successful for {brand_name}.")
                     api_successful = True
-                    return raw_data, "API Backup (Paid)"
+                    return raw_data
 
     except Exception as api_err:
         print(f"  ⚠️ Primary API generation failed or limits exceeded: {api_err}. Transitioning to Playwright fallback...")
-        # Catching the exception allows execution to automatically proceed to the browser fallback below
 
     # =====================================================================
     # ATTEMPT 2: GOOGLE FLOW WEB AUTOMATION (SECONDARY / BACKUP OPTION)
@@ -1889,14 +1888,14 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
                         if img_res.status_code == 200:
                             raw_data = img_res.content
                             print(f"  ✅ Web UI image generated successfully via Google Flow!")
-                            return raw_data, "Google Flow (Zero Cost)"
+                            return raw_data
                             
             except Exception as automation_err:
                 print(f"  ⚠️ Google Flow Web Automation failed: {automation_err}")
         else:
             print("  ⚠️ 'flow_auth_state.json' file missing. Bypassing automation fallback.")
 
-    return None, "Failed"
+    return None
 # --- Email Sending ---
 def create_email_message_with_image(sender, to_emails_list, subject, message_text_html, image_bytes=None, brand_name=None):
     """Creates an email message, assigning a clear, custom filename to attachments to prevent 'noname' display."""
