@@ -1752,9 +1752,18 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
     """
     Generates a professional 3-panel side-by-side marketing funnel mockup collage.
     Integrates dynamic, semantic target audiences based on the brand's direct demographic profile.
-    - ATTEMPT 1 (Primary): Direct API method (gemini-3-pro-image-preview).
-    - ATTEMPT 2 (Secondary): Playwright browser automation fallback.
+    - ATTEMPT 1 (Primary / Active): Uses Playwright browser automation on Google Flow (Zero Cost).
+    - ATTEMPT 2 (Secondary / Paused): Paid direct API fallback (gemini-3-pro-image-preview) 
+      is managed by the ENABLE_PAID_API_FALLBACK diagnostic switch.
     """
+    # =====================================================================
+    # DIAGNOSTICS CONFIGURATION SWITCH
+    # =====================================================================
+    # Set to True if you want to turn the Paid Gemini API backup back on.
+    # Set to False to keep it completely paused during browser automation testing.
+    ENABLE_PAID_API_FALLBACK = False 
+    # =====================================================================
+
     if not visual_context:
         print(f"  Skipping image generation for {brand_name}: Visual context was not extracted.")
         return None
@@ -1812,105 +1821,113 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
       "Bringing your brand back when residents are ready to order."
     """
     
-    api_successful = False
+    login_url = os.getenv("FLOW_LOGIN_URL")
+    username = os.getenv("FLOW_USERNAME")
+    password = os.getenv("FLOW_PASSWORD")
+    auth_state_file = "flow_auth_state.json"
+    flow_prompt = f"Generate this visual setup for the brand '{brand_name}': {image_prompt}"
+    
+    automation_successful = False
     raw_data = None
 
     # =====================================================================
-    # ATTEMPT 1: DIRECT API GENERATION (PRIMARY / DEFAULT PRODUCTION ENGINE)
+    # ATTEMPT 1: BROWSER AUTOMATION (PRIMARY TESTING ENGINE)
     # =====================================================================
-    print(f"  🎨 Generating image using primary Gemini API model 'gemini-3-pro-image-preview'...")
-    try:
-        response = gemini_client.models.generate_content(
-            model="gemini-3-pro-image-preview",
-            contents=image_prompt,
-            config=types.GenerateContentConfig(
-                response_modalities=["IMAGE", "TEXT"]
-            )
-        )
-
-        if response.candidates:
-            for part in response.candidates[0].content.parts:
-                if part.inline_data and part.inline_data.mime_type.startswith("image/"):
-                    raw_data = part.inline_data.data
-                    
-                    if isinstance(raw_data, str):
-                        raw_data = base64.b64decode(raw_data)
-                    elif isinstance(raw_data, bytes):
-                        if not raw_data.startswith(b'\xff\xd8\xff'):
-                            raw_data = base64.b64decode(raw_data)
-                    
-                    print(f"  ✅ Primary API image generation successful for {brand_name}.")
-                    api_successful = True
-                    return raw_data
-
-    except Exception as api_err:
-        print(f"  ⚠️ Primary API generation failed or limits exceeded: {api_err}. Transitioning to Playwright fallback...")
-
-    # =====================================================================
-    # ATTEMPT 2: GOOGLE FLOW WEB AUTOMATION (SECONDARY / BACKUP OPTION)
-    # =====================================================================
-    if not api_successful:
-        login_url = os.getenv("FLOW_LOGIN_URL")
-        username = os.getenv("FLOW_USERNAME")
-        password = os.getenv("FLOW_PASSWORD")
-        auth_state_file = "flow_auth_state.json"
-        flow_prompt = f"Generate this visual setup for the brand '{brand_name}': {image_prompt}"
-
-        if os.path.exists(auth_state_file):
-            print(f"  🎬 Launching Playwright browser to generate mockup on Google Flow...")
-            try:
-                with sync_playwright() as p:
-                    browser = p.chromium.launch(headless=True)
-                    context = browser.new_context(storage_state=auth_state_file)
-                    page = context.new_page()
-                    
-                    page.set_viewport_size({"width": 1280, "height": 800})
-                    page.goto("https://labs.google/fx/tools/flow", wait_until="networkidle", timeout=45000)
-                    
-                    # Verify login state
-                    if "signin" in page.url or page.locator("text=Choose an account").is_visible():
-                        print("  ❌ Session expired. Please regenerate your 'flow_auth_state.json' file locally.")
-                        browser.close()
-                        raise Exception("Session expired.")
-                    
-                    print("    ➕ Creating a new workspace project...")
-                    page.locator("text=New project").click()
-                    page.wait_for_load_state("networkidle")
-                    
-                    if page.locator("text=Got it").is_visible():
-                        page.locator("text=Got it").click()
-                    
-                    prompt_input_selector = "textarea[placeholder*='What do you want to create']"
-                    page.wait_for_selector(prompt_input_selector, timeout=15000)
-                    
-                    print("    📝 Entering design instructions into the canvas input...")
-                    page.fill(prompt_input_selector, flow_prompt)
-                    page.press(prompt_input_selector, "Enter")
-                    
-                    print("    ⏳ Prompt submitted. Rendering canvas (up to 120s)...")
-                    output_image_selector = "div[class*='media-card'] img, div[class*='image'] img"
-                    page.wait_for_selector(output_image_selector, timeout=120000)
-                    
-                    img_srcs = page.locator("img").all_get_attributes("src")
+    if os.path.exists(auth_state_file):
+        print(f"  🎬 Launching Playwright browser to generate mockup on Google Flow...")
+        try:
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                context = browser.new_context(storage_state=auth_state_file)
+                page = context.new_page()
+                
+                page.set_viewport_size({"width": 1280, "height": 800})
+                page.goto("https://labs.google/fx/tools/flow", wait_until="networkidle", timeout=45000)
+                
+                # Verify login state
+                if "signin" in page.url or page.locator("text=Choose an account").is_visible():
+                    print("  ❌ Session expired. Please regenerate your 'flow_auth_state.json' file locally.")
                     browser.close()
-                    
-                    valid_src = None
-                    for src in img_srcs:
-                        if src and ("googleusercontent.com" in src or "labs.google" in src):
-                            valid_src = src
-                            break
-                    
-                    if valid_src:
-                        img_res = requests.get(valid_src, timeout=15)
-                        if img_res.status_code == 200:
-                            raw_data = img_res.content
-                            print(f"  ✅ Web UI image generated successfully via Google Flow!")
-                            return raw_data
-                            
+                    raise Exception("Session expired.")
+                
+                print("    ➕ Creating a new workspace project...")
+                page.locator("text=New project").click()
+                page.wait_for_load_state("networkidle")
+                
+                if page.locator("text=Got it").is_visible():
+                    page.locator("text=Got it").click()
+                
+                prompt_input_selector = "textarea[placeholder*='What do you want to create']"
+                page.wait_for_selector(prompt_input_selector, timeout=15000)
+                
+                print("    📝 Entering design instructions into the canvas input...")
+                page.fill(prompt_input_selector, flow_prompt)
+                page.press(prompt_input_selector, "Enter")
+                
+                print("    ⏳ Prompt submitted. Rendering canvas (up to 120s)...")
+                output_image_selector = "div[class*='media-card'] img, div[class*='image'] img"
+                page.wait_for_selector(output_image_selector, timeout=120000)
+                
+                img_srcs = page.locator("img").all_get_attributes("src")
+                browser.close()
+                
+                valid_src = None
+                for src in img_srcs:
+                    if src and ("googleusercontent.com" in src or "labs.google" in src):
+                        valid_src = src
+                        break
+                
+                if valid_src:
+                    img_res = requests.get(valid_src, timeout=15)
+                    if img_res.status_code == 200:
+                        raw_data = img_res.content
+                        print(f"  ✅ Web UI image generated successfully via Google Flow!")
+                        automation_successful = True
+                        return raw_data
+                        
             except Exception as automation_err:
-                print(f"  ⚠️ Google Flow Web Automation failed: {automation_err}")
+                print(f"  ⚠️ Google Flow Web Automation failed: {automation_err}.")
         else:
-            print("  ⚠️ 'flow_auth_state.json' file missing. Bypassing automation fallback.")
+            print("  ⚠️ 'flow_auth_state.json' file missing. Bypassing automation phase.")
+
+    # =====================================================================
+    # ATTEMPT 2: DIRECT API GENERATION (PAUSED/CONDITIONAL FALLBACK)
+    # =====================================================================
+    if not automation_successful:
+        if ENABLE_PAID_API_FALLBACK:
+            print(f"  🚨 Triggering paid API backup model 'gemini-3-pro-image-preview'...")
+            try:
+                response = gemini_client.models.generate_content(
+                    model="gemini-3-pro-image-preview",
+                    contents=image_prompt,
+                    config=types.GenerateContentConfig(
+                        response_modalities=["IMAGE", "TEXT"]
+                    )
+                )
+
+                if response.candidates:
+                    for part in response.candidates[0].content.parts:
+                        if part.inline_data and part.inline_data.mime_type.startswith("image/"):
+                            raw_data = part.inline_data.data
+                            
+                            if isinstance(raw_data, str):
+                                raw_data = base64.b64decode(raw_data)
+                            elif isinstance(raw_data, bytes):
+                                if not raw_data.startswith(b'\xff\xd8\xff'):
+                                    raw_data = base64.b64decode(raw_data)
+                            
+                            print(f"  ✅ API fallback image generation complete for {brand_name}.")
+                            return raw_data
+
+                print(f"  ❌ Fallback API responded, but could not retrieve image data candidates.")
+                return None
+                
+            except Exception as api_err:
+                print(f"  ❌ API fallback model generation failed: {api_err}")
+                return None
+        else:
+            print("  ℹ️ Paid API Fallback is currently PAUSED. No image will be attached to the email.")
+            return None
 
     return None
 # --- Email Sending ---
