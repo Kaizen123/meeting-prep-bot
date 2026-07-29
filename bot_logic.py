@@ -1689,9 +1689,9 @@ def generate_brief_with_gemini(gemini_llm_client, YOUR_DETAILED_PROMPT_TEMPLATE_
 # =====================================================================
 def get_brand_visual_context(gemini_client, brand_name, industry, generated_brief=""):
     """
-    Acts as the Creative Director: Analyzes the generated pre-meeting brief to
-    extract the exact 'Creative Hook', 'The Big Idea', or 'Solution A/B' proposed.
-    Transforms this active sales pitch into the core theme of the mockups.
+    Acts as the Creative Director: Analyzes the generated pre-meeting brief, industry, and 
+    brand sub-category context to extract active marketing campaigns AND deduce a highly 
+    tailored, dynamic target audience for the visual mockups.
     """
     if not gemini_client: 
         return None
@@ -1704,21 +1704,33 @@ def get_brand_visual_context(gemini_client, brand_name, industry, generated_brie
     ---
     
     Task:
-    1. is_well_known: Set to true ONLY if '{brand_name}' is a widely recognized national or multinational brand with established guidelines, recognizable logos, and clear visual identifiers in India (e.g., McDonald's, KFC, Coca-Cola, Tanishq, Puma, Horlicks, Swiggy, Amazon). Set to false if the brand is highly localized, a minor regional outlet, or obscure to prevent generating hallucinated logos.
+    1. is_well_known: Set to true ONLY if '{brand_name}' is a widely recognized national or multinational brand with established guidelines, recognizable logos, and clear visual identifiers in India (e.g., McDonald's, KFC, Coca-Cola, Tanishq, Puma, Horlicks, Swiggy, Amazon). Set to false if the brand is highly localized, a minor regional outlet, or obscure.
     2. primary_colors: Identify their exact 2 primary brand colors (e.g., McDonald's is "Golden Yellow and Crimson Red", Tanishq is "Deep Maroon and Gold").
-    3. THE PITCH / CREATIVE HOOK: Scan the provided brief carefully. Focus specifically on the real-world, active, and researched campaigns of the brand mentioned in the text (e.g., Coke's Halftime campaign, Pizza Hut's current regional menus, or Swiggy's grocery delivery service). Avoid generic themes; prioritize actual active projects or high-intent strategic solutions proposed in the text.
+    3. THE PITCH / CREATIVE HOOK: Scan the provided brief carefully. Focus specifically on the real-world, active, and researched campaigns of the brand mentioned in the text. Avoid generic themes.
     4. CREATE THE VISUAL SCENE: Combine the identified creative campaign/theme with premium, minimalist visual staging. 
-       - IMPORTANT EXCLUSION: If the brief's creative hook or solutions propose a physical on-ground setup (such as a physical canopy, kiosk, sampling table, delivery truck, physical promotional stand, or physical booth), DO NOT depict these physical structures inside the static ad panels. The ad panels (Gate, Lift, and App) represent static graphic and print ad campaigns, not photos of live event stalls.
-       - Instead, describe a simple, clean, brand-specific commercial advertisement design centered on products or standard service/lifestyle imagery (e.g., for Swiggy Instamart, display a beautifully styled arrangement of fresh, high-quality groceries or standard brand delivery bags with modern graphic typography). 
-       - Keep the layout photorealistic, premium, and focused directly on standard brand-specific assets.
-    5. CREATE A SLOGAN: Extract the exact slogan proposed in the brief's creative hook, or draft a short, impactful 2-to-3 word slogan that matches the strategic pitch (e.g., "Warmth, Shared", "Halftime Refresh"). Do not invent long sentences.
-    
+       - EXCLUSION: Do not depict physical booths, tents, kiosks, or sampling structures. Focus solely on clean static print ads and graphic layouts on the gate, inside the elevator, and on the mobile interface.
+    5. CREATE A SLOGAN: Extract the exact slogan proposed in the brief's creative hook, or draft a short, impactful 2-to-3 word slogan that matches the strategic pitch.
+    6. DEDUCE TARGET AUDIENCE (DYNAMIC & SEMANTIC MATCHING):
+       - Create a concise description of 1 or 2 specific Indian residents standing near or interacting with the advertisement.
+       - The characters must match the exact nature and purchase intent of the brand.
+       - Match the industry naturally. Examples:
+         - FMCG (General): A modern Indian homemaker or family.
+         - Baby FMCG (e.g., Huggies/Pampers): An Indian mother carrying a baby.
+         - Healthcare (General): An elderly resident or middle-aged caregiver.
+         - Healthcare (Physiotherapy/Sports recovery): An active Indian athlete in sports gear or recovery patient.
+         - Finance/Fintech: A young corporate working professional with a thoughtful expression.
+         - Jewellery: An elegant Indian woman or young aspirational couple.
+         - Pets: A pet owner walking their dog.
+         - OTT/Gaming: A young adult or parent with a child showing excited curiosity.
+       - IMPORTANT: Describe the person/people concisely (e.g., "An elegant Indian woman wearing casual smart attire", "An elderly Indian couple walking hand-in-hand") so it fits cleanly into the panel composition without looking cluttered. Keep it down to a single focus character or cohesive couple/family.
+
     Return ONLY a valid JSON object:
     {{
         "is_well_known": true/false,
         "primary_colors": "...",
         "visual_scene": "...",
-        "short_slogan": "..."
+        "short_slogan": "...",
+        "target_audience": "Describe the dynamic target consumer(s) in clean, photorealistic terms"
     }}
     """
     
@@ -1739,11 +1751,9 @@ from playwright.sync_api import sync_playwright
 def generate_creative_with_gemini_image(gemini_client, brand_name, industry, visual_context):
     """
     Generates a professional 3-panel side-by-side marketing funnel mockup collage.
-    - ATTEMPT 1 (Primary / Default): Uses direct API-based paid method (gemini-3-pro-image-preview) 
-      for instant, reliable production runs.
-    - ATTEMPT 2 (Secondary / Testing): Falls back to Playwright browser automation (Google Flow) 
-      if the API limits are exceeded or fail.
-    Returns: raw_data bytes (or None)
+    Integrates dynamic, semantic target audiences based on the brand's direct demographic profile.
+    - ATTEMPT 1 (Primary): Direct API method (gemini-3-pro-image-preview).
+    - ATTEMPT 2 (Secondary): Playwright browser automation fallback.
     """
     if not visual_context:
         print(f"  Skipping image generation for {brand_name}: Visual context was not extracted.")
@@ -1758,7 +1768,14 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
     visual_scene = visual_context.get("visual_scene", "modern lifestyle imagery")
     short_slogan = visual_context.get("short_slogan", "Exclusive Offer")
     
-    # EXACT DESIGN PROMPT WITH 3-PANEL LAYOUT PRESERVED
+    # Extract the dynamic audience description or fallback cleanly if missing
+    target_audience = visual_context.get(
+        "target_audience", 
+        "A modern Indian resident dressed in clean, smart-casual attire"
+    )
+    print(f"  🎯 Dynamic Target Audience Selected: '{target_audience}'")
+    
+    # EXACT DESIGN PROMPT WITH DYNAMIC TARGET AUDIENCE INJECTED
     image_prompt = f"""
     Create a highly professional, commercial-grade horizontal mockup collage with a clean, symmetric aspect ratio. 
     The collage consists exactly of three vertical panels (columns) positioned side-by-side, separated by thin, clean, solid white lines.
@@ -1775,7 +1792,7 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
     - ENVIRONMENT: Street-level daylight view of a premium Indian apartment complex entrance with a standard black sliding iron residential gate. High-rise buildings are visible in the soft-focus background.
     - MEDIA SETUP: A standard-sized horizontal rectangular banner (proportional scale, approximately 4 feet wide by 2.5 feet tall) is mounted flat and cleanly centered horizontally on the black gate bars. It must look naturally scaled and realistic, leaving significant portions of the gate's black bars visible above, below, and on the sides (not oversized, and not covering the full height or width of the gate).
     - ARTWORK: Displays '{brand_name}' logo, the campaign scene ("{visual_scene}"), and slogan "{short_slogan}".
-    - HUMAN INTERACTION: A modern Indian resident walking past the gate, caught in a natural, candid moment looking directly at the advertisement.
+    - HUMAN INTERACTION: {target_audience} walking past the gate, caught in a natural, candid moment looking directly at the advertisement.
     - CAPTION: White text centered in a dark, semi-transparent horizontal strip at the bottom:
       "When residents enter, your brand is discovered."
 
@@ -1783,7 +1800,7 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
     - ENVIRONMENT: Interior of a sleek passenger lift cabin with modern brushed silver steel walls.
     - MEDIA: A vertical poster mounted inside a thin, clean, minimalist aluminum snap frame with soft drop shadows on the wall panel.
     - ARTWORK: Vertical layout of '{brand_name}' campaign scene ("{visual_scene}"), logo, and slogan "{short_slogan}".
-    - HUMAN INTERACTION: The same resident standing naturally in the lift, looking at the poster.
+    - HUMAN INTERACTION: The exact same {target_audience} from Panel 1 standing naturally inside the lift, looking at the poster.
     - CAPTION: White text centered in a dark, semi-transparent horizontal strip at the bottom:
       "Capturing undivided attention during high-focus transit moments."
 
