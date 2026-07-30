@@ -1689,9 +1689,9 @@ def generate_brief_with_gemini(gemini_llm_client, YOUR_DETAILED_PROMPT_TEMPLATE_
 # =====================================================================
 def get_brand_visual_context(gemini_client, brand_name, industry, generated_brief=""):
     """
-    Acts as the Creative Director: Analyzes the generated pre-meeting brief, industry, and 
-    brand sub-category context to extract active marketing campaigns AND deduce a highly 
-    tailored, dynamic target audience for the visual mockups.
+    Acts as the Creative Director: Analyzes the pre-meeting brief and industry context
+    to extract active campaigns, select target audiences, and dynamically generate 
+    highly relevant, context-aware visual captions for the 3-panel collage.
     """
     if not gemini_client: 
         return None
@@ -1713,16 +1713,24 @@ def get_brand_visual_context(gemini_client, brand_name, industry, generated_brie
     6. DEDUCE TARGET AUDIENCE (DYNAMIC & SEMANTIC MATCHING):
        - Create a concise description of 1 or 2 specific Indian residents standing near or interacting with the advertisement.
        - The characters must match the exact nature and purchase intent of the brand.
-       - Match the industry naturally. Examples:
-         - FMCG (General): A modern Indian homemaker or family.
-         - Baby FMCG (e.g., Huggies/Pampers): An Indian mother carrying a baby.
-         - Healthcare (General): An elderly resident or middle-aged caregiver.
-         - Healthcare (Physiotherapy/Sports recovery): An active Indian athlete in sports gear or recovery patient.
-         - Finance/Fintech: A young corporate working professional with a thoughtful expression.
-         - Jewellery: An elegant Indian woman or young aspirational couple.
-         - Pets: A pet owner walking their dog.
-         - OTT/Gaming: A young adult or parent with a child showing excited curiosity.
-       - IMPORTANT: Describe the person/people concisely (e.g., "An elegant Indian woman wearing casual smart attire", "An elderly Indian couple walking hand-in-hand") so it fits cleanly into the panel composition without looking cluttered. Keep it down to a single focus character or cohesive couple/family.
+       - Match the industry naturally.
+    7. GENERATE DYNAMIC PANEL CAPTIONS (MUST BE UNDER 12 WORDS EACH):
+       - Generate customized bottom caption text for each panel that directly aligns with the brand's industry and campaign goals.
+       - Keep caption_panel1 and caption_panel2 highly polished, professional, and matching their funnel stage (Awareness, Recall).
+       - Ensure caption_panel3 (Conversion Stage) matches the industry conversion metric exactly:
+         - FMCG / Food / Quick Commerce: "Bringing your brand back when residents are ready to order."
+         - Education: "Prompting parent inquiries and campus tours at the point of decision."
+         - Jewellery: "Driving luxury brand aspiration and store visits at the moment of intent."
+         - Automotive: "Prompting test-drive bookings when residents evaluate their next vehicle."
+         - Finance/Fintech: "Driving secure account sign-ups and premium applications at point of intent."
+         - Home Goods/Electronics: "Inspiring home consultation bookings and retail visits during relaxed hours."
+         - Real Estate: "Cultivating high-value site visits for prospective residential buyers."
+         - Wellness/Fitness: "Encouraging trial class bookings as residents plan their wellness routines."
+         - Hospitality/Travel: "Sparking leisure travel bookings and holiday planning in relaxed moments."
+         - Pets: "Triggering pet care bookings and premium nutrition orders near home."
+         - OTT/Entertainment: "Prompting subscription sign-ups when residents seek leisure entertainment."
+         - Apparel/Fashion: "Inspiring seasonal wardrobe updates and direct e-commerce checkouts."
+         - Others: Synthesize a highly strategic equivalent following this pattern.
 
     Return ONLY a valid JSON object:
     {{
@@ -1730,7 +1738,10 @@ def get_brand_visual_context(gemini_client, brand_name, industry, generated_brie
         "primary_colors": "...",
         "visual_scene": "...",
         "short_slogan": "...",
-        "target_audience": "Describe the dynamic target consumer(s) in clean, photorealistic terms"
+        "target_audience": "Describe the dynamic target consumer(s) in clean, photorealistic terms",
+        "caption_panel1": "Caption text for Panel 1 under 12 words",
+        "caption_panel2": "Caption text for Panel 2 under 12 words",
+        "caption_panel3": "Caption text for Panel 3 under 12 words"
     }}
     """
     
@@ -1751,9 +1762,8 @@ from playwright.sync_api import sync_playwright
 def generate_creative_with_gemini_image(gemini_client, brand_name, industry, visual_context):
     """
     Generates a professional 3-panel side-by-side marketing funnel mockup collage.
-    Integrates dynamic, semantic target audiences based on the brand's direct demographic profile.
-    - ATTEMPT 1 (Primary): Direct API method (gemini-3-pro-image-preview).
-    - ATTEMPT 2 (Secondary): Playwright browser automation fallback.
+    Integrates dynamic, semantic target audiences and custom dynamic captions based on 
+    the brand's specific industry sector.
     """
     if not visual_context:
         print(f"  Skipping image generation for {brand_name}: Visual context was not extracted.")
@@ -1768,14 +1778,28 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
     visual_scene = visual_context.get("visual_scene", "modern lifestyle imagery")
     short_slogan = visual_context.get("short_slogan", "Exclusive Offer")
     
-    # Extract the dynamic audience description or fallback cleanly if missing
+    # Extract dynamic demographic values and fallbacks
     target_audience = visual_context.get(
         "target_audience", 
         "A modern Indian resident dressed in clean, smart-casual attire"
     )
-    print(f"  🎯 Dynamic Target Audience Selected: '{target_audience}'")
+    caption_p1 = visual_context.get(
+        "caption_panel1", 
+        "When residents enter, your brand is discovered."
+    )
+    caption_p2 = visual_context.get(
+        "caption_panel2", 
+        "Capturing undivided attention during high-focus transit moments."
+    )
+    caption_p3 = visual_context.get(
+        "caption_panel3", 
+        "Bringing your brand back when residents are ready to order."
+    )
     
-    # EXACT DESIGN PROMPT WITH DYNAMIC TARGET AUDIENCE INJECTED
+    print(f"  🎯 Dynamic Target Audience: '{target_audience}'")
+    print(f"  📝 Dynamic Captions -> P1: '{caption_p1}' | P2: '{caption_p2}' | P3: '{caption_p3}'")
+    
+    # EXACT DESIGN PROMPT WITH DYNAMIC VALUES INJECTED
     image_prompt = f"""
     Create a highly professional, commercial-grade horizontal mockup collage with a clean, symmetric aspect ratio. 
     The layout consists of a clean, plain white top header banner, followed by exactly three vertical panels (columns) positioned side-by-side, separated by thin, clean, solid white lines.
@@ -1793,26 +1817,26 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
 
     # PANEL 1 (LEFT COLUMN): OUTDOOR RESIDENTIAL GATEWAY (Awareness)
     - ENVIRONMENT: Street-level daylight view of a premium Indian apartment complex entrance with a standard black sliding iron residential gate. High-rise buildings are visible in the soft-focus background.
-    - MEDIA SETUP: A standard-sized horizontal rectangular banner (proportional scale, approximately 4 feet wide by 2.5 feet tall) is mounted flat and cleanly centered horizontally on the black gate bars. It must look naturally scaled and realistic, leaving significant portions of the gate's black bars visible above, below, and on the sides (not oversized, and not covering the full height or width of the gate).
+    - MEDIA SETUP: A standard-sized horizontal rectangular banner (proportional scale, approximately 4 feet wide by 2.5 feet tall) is mounted flat and cleanly centered horizontally on the gate bars. It must look naturally scaled and realistic, leaving significant portions of the gate's black bars visible above, below, and on the sides (not oversized, and not covering the full height or width of the gate).
     - ARTWORK: Displays '{brand_name}' logo, the campaign scene ("{visual_scene}"), and slogan "{short_slogan}".
     - HUMAN INTERACTION: {target_audience} walking past the gate, caught in a natural, candid moment looking directly at the advertisement.
-    - CAPTION: White text centered in a dark, semi-transparent horizontal strip at the bottom:
-      "When residents enter, your brand is discovered."
+    - CAPTION: White text centered in a dark, semi-transparent horizontal strip at the bottom. The text must read exactly:
+      "{caption_p1}"
 
     # PANEL 2 (MIDDLE COLUMN): CAPTIVE ELEVATOR CABIN (Recall)
     - ENVIRONMENT: Interior of a sleek passenger lift cabin with modern brushed silver steel walls.
     - MEDIA: A vertical poster mounted inside a thin, clean, minimalist aluminum snap frame with soft drop shadows on the wall panel.
     - ARTWORK: Vertical layout of '{brand_name}' campaign scene ("{visual_scene}"), logo, and slogan "{short_slogan}".
     - HUMAN INTERACTION: The exact same {target_audience} from Panel 1 standing naturally inside the lift, looking at the poster.
-    - CAPTION: White text centered in a dark, semi-transparent horizontal strip at the bottom:
-      "Capturing undivided attention during high-focus transit moments."
+    - CAPTION: White text centered in a dark, semi-transparent horizontal strip at the bottom. The text must read exactly:
+      "{caption_p2}"
 
     # PANEL 3 (RIGHT COLUMN): NATIVE MOBILE IN-APP PLACEMENT (Conversion)
     - ENVIRONMENT: Premium close-up photo of a modern smartphone held in a hand, against a softly blurred home background.
     - MEDIA: Smartphone screen displaying a dark-themed NoBrokerHood application interface.
     - UI DETAILS: A clean white delivery pre-approval card floats at the top with a green header. Directly below is a full-width vertical banner ad for '{brand_name}' showing the campaign scene ("{visual_scene}"), logo, and slogan "{short_slogan}".
-    - CAPTION: White text centered in a dark, semi-transparent horizontal strip at the bottom:
-      "Bringing your brand back when residents are ready to order."
+    - CAPTION: White text centered in a dark, semi-transparent horizontal strip at the bottom. The text must read exactly:
+      "{caption_p3}"
     """
     
     api_successful = False
