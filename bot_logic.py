@@ -1778,9 +1778,12 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
     # EXACT DESIGN PROMPT WITH DYNAMIC TARGET AUDIENCE INJECTED
     image_prompt = f"""
     Create a highly professional, commercial-grade horizontal mockup collage with a clean, symmetric aspect ratio. 
-    The collage consists exactly of three vertical panels (columns) positioned side-by-side, separated by thin, clean, solid white lines.
+    The layout consists of a clean, plain white top header banner, followed by exactly three vertical panels (columns) positioned side-by-side, separated by thin, clean, solid white lines.
     
-    CRITICAL STRUCTURE RULE: No top banners, title bars, headers, or plain white text zones are permitted at the top of the image frame. The image must begin directly with the three panels.
+    # TOP HEADER BANNER (Span across the entire width of the collage):
+    - A clean, solid white top header banner is required at the very top of the collage.
+    - Displays the text centered in a highly polished, clean modern sans-serif typeface in a dark charcoal gray color (#333333):
+      "From Visibility to Conversion — Powered by NoBrokerHood"
 
     # OVERALL STYLE, COLOR & AESTHETIC:
     - Consistent professional color grading and editorial tone across all three panels.
@@ -2022,17 +2025,15 @@ def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_
     if creative_image_bytes:
         print("  📸 Attaching image to email HTML...")
         creative_html = """
-        <div style="margin-bottom: 30px; background-color: #ffffff; border: 1px solid #e2e8f0; padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
-            <div style="text-align: center; margin-bottom: 25px; border-bottom: 1px solid #f0f4f8; padding-bottom: 20px;">
-                <h2 style="color: #2d3748; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 20px; font-weight: 600; margin: 0 0 8px 0; letter-spacing: -0.2px;">
-                    From Visibility to Conversion — Powered by NoBrokerHood
-                </h2>
-                <p style="font-size: 13px; color: #718096; margin: 0; font-style: italic;">
-                    A suggested 3-in-1 visual pitch (Gate, Lift, and App) based on the brand's current live campaigns and colors:
-                </p>
-            </div>
+        <div style="margin-bottom: 30px; background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 25px; border-radius: 8px;">
+            <h3 style="color: #2b6cb0; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 18px; font-weight: bold; text-transform: uppercase; margin-top: 0; border-bottom: 2px solid #bee3f8; padding-bottom: 10px; text-align: left;">
+                💡 THOUGHT-STARTERS: CREATIVES BASED ON CURRENT MARKET INSIGHTS
+            </h3>
+            <p style="font-size: 14px; color: #4a5568; margin-bottom: 20px; font-style: italic; text-align: left;">
+                A suggested 3-in-1 visual pitch (Gate, Lift, and App) based on the brand's current live campaigns and colors:
+            </p>
             <center>
-                <img src="cid:creative_image" style="max-width: 100%; height: auto; border-radius: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.08);" alt="Brand Creative">
+                <img src="cid:creative_image" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 6px 12px rgba(0,0,0,0.15);" alt="Brand Creative">
             </center>
         </div>
         """
