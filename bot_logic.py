@@ -1691,7 +1691,7 @@ def get_brand_visual_context(gemini_client, brand_name, industry, generated_brie
     """
     Acts as the Creative Director: Analyzes the pre-meeting brief and industry context
     to extract active campaigns, select target audiences, and dynamically generate 
-    highly relevant, context-aware visual captions for the 3-panel collage.
+    the conversion-oriented caption for Panel 3.
     """
     if not gemini_client: 
         return None
@@ -1714,9 +1714,7 @@ def get_brand_visual_context(gemini_client, brand_name, industry, generated_brie
        - Create a concise description of 1 or 2 specific Indian residents standing near or interacting with the advertisement.
        - The characters must match the exact nature and purchase intent of the brand.
        - Match the industry naturally.
-    7. GENERATE DYNAMIC PANEL CAPTIONS (MUST BE UNDER 12 WORDS EACH):
-       - Generate customized bottom caption text for each panel that directly aligns with the brand's industry and campaign goals.
-       - Keep caption_panel1 and caption_panel2 highly polished, professional, and matching their funnel stage (Awareness, Recall).
+    7. GENERATE DYNAMIC PANEL 3 CAPTION (MUST BE UNDER 12 WORDS):
        - Ensure caption_panel3 (Conversion Stage) matches the industry conversion metric exactly:
          - FMCG / Food / Quick Commerce: "Bringing your brand back when residents are ready to order."
          - Education: "Prompting parent inquiries and campus tours at the point of decision."
@@ -1739,8 +1737,6 @@ def get_brand_visual_context(gemini_client, brand_name, industry, generated_brie
         "visual_scene": "...",
         "short_slogan": "...",
         "target_audience": "Describe the dynamic target consumer(s) in clean, photorealistic terms",
-        "caption_panel1": "Caption text for Panel 1 under 12 words",
-        "caption_panel2": "Caption text for Panel 2 under 12 words",
         "caption_panel3": "Caption text for Panel 3 under 12 words"
     }}
     """
@@ -1762,8 +1758,8 @@ from playwright.sync_api import sync_playwright
 def generate_creative_with_gemini_image(gemini_client, brand_name, industry, visual_context):
     """
     Generates a professional 3-panel side-by-side marketing funnel mockup collage.
-    Integrates dynamic, semantic target audiences and custom dynamic captions based on 
-    the brand's specific industry sector.
+    - Panel 1 and Panel 2 retain strictly static, brand-agnostic marketing funnel captions.
+    - Panel 3 applies dynamic captions specific to the brand's industry and conversion goal.
     """
     if not visual_context:
         print(f"  Skipping image generation for {brand_name}: Visual context was not extracted.")
@@ -1783,23 +1779,21 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
         "target_audience", 
         "A modern Indian resident dressed in clean, smart-casual attire"
     )
-    caption_p1 = visual_context.get(
-        "caption_panel1", 
-        "When residents enter, your brand is discovered."
-    )
-    caption_p2 = visual_context.get(
-        "caption_panel2", 
-        "Capturing undivided attention during high-focus transit moments."
-    )
+    
+    # STATIC CAPTIONS: Standardized funnel markers
+    caption_p1 = "When residents enter, your brand is discovered."
+    caption_p2 = "Capturing undivided attention during high-focus transit moments."
+    
+    # DYNAMIC CAPTION: Customized conversion-stage marker
     caption_p3 = visual_context.get(
         "caption_panel3", 
         "Bringing your brand back when residents are ready to order."
     )
     
     print(f"  🎯 Dynamic Target Audience: '{target_audience}'")
-    print(f"  📝 Dynamic Captions -> P1: '{caption_p1}' | P2: '{caption_p2}' | P3: '{caption_p3}'")
+    print(f"  📝 Captions -> P1 (Static): '{caption_p1}' | P2 (Static): '{caption_p2}' | P3 (Dynamic): '{caption_p3}'")
     
-    # EXACT DESIGN PROMPT WITH DYNAMIC VALUES INJECTED
+    # EXACT DESIGN PROMPT WITH STATIC & DYNAMIC VALUES INJECTED
     image_prompt = f"""
     Create a highly professional, commercial-grade horizontal mockup collage with a clean, symmetric aspect ratio. 
     The layout consists of a clean, plain white top header banner, followed by exactly three vertical panels (columns) positioned side-by-side, separated by thin, clean, solid white lines.
@@ -1817,7 +1811,7 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
 
     # PANEL 1 (LEFT COLUMN): OUTDOOR RESIDENTIAL GATEWAY (Awareness)
     - ENVIRONMENT: Street-level daylight view of a premium Indian apartment complex entrance with a standard black sliding iron residential gate. High-rise buildings are visible in the soft-focus background.
-    - MEDIA SETUP: A standard-sized horizontal rectangular banner (proportional scale, approximately 4 feet wide by 2.5 feet tall) is mounted flat and cleanly centered horizontally on the gate bars. It must look naturally scaled and realistic, leaving significant portions of the gate's black bars visible above, below, and on the sides (not oversized, and not covering the full height or width of the gate).
+    - MEDIA SETUP: A standard-sized horizontal rectangular banner (proportional scale, approximately 4 feet wide by 2.5 feet tall) is mounted flat and cleanly centered horizontally on the black gate bars. It must look naturally scaled and realistic, leaving significant portions of the gate's black bars visible above, below, and on the sides (not oversized, and not covering the full height or width of the gate).
     - ARTWORK: Displays '{brand_name}' logo, the campaign scene ("{visual_scene}"), and slogan "{short_slogan}".
     - HUMAN INTERACTION: {target_audience} walking past the gate, caught in a natural, candid moment looking directly at the advertisement.
     - CAPTION: White text centered in a dark, semi-transparent horizontal strip at the bottom. The text must read exactly:
