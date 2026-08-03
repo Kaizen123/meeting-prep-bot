@@ -478,10 +478,22 @@ class Industry(enum.Enum):
 
 
 
+# Master list of Media & Advertising Agencies
+KNOWN_AGENCIES_LIST = [
+    "wpp", "wpp media", "groupm", "mindshare", "wavemaker", "essencemediacom", 
+    "publicis", "publicis media", "havas", "havas media", "pivotroots", 
+    "omd", "omc", "omnicom", "omnicom media group", "starcom", "zenith", 
+    "dentsu", "lyxel & flamingo", "lyxelandflamingo", "ls digital", "lsdigital", 
+    "madison", "madison media", "madison ooh", "interactive avenues", 
+    "hiveminds", "oap india", "konnect services"
+]
+
 class Brand_Details(BaseModel):
     brand_name: str
-    industry:   Industry
-    sub_category_keywords: list[str] # NEW: Added to hold direct competitors/categories
+    industry: Industry
+    sub_category_keywords: list[str]
+    is_agency_meeting: bool = False
+    agency_name: str = "N/A"
     
     class Config:
         use_enum_values = True  # Use enum values instead of names in JSON output
@@ -489,129 +501,159 @@ class Brand_Details(BaseModel):
 Allowed_Industries = [industry.value for industry in Industry]
 
 BRAND_EXTRACTION_PROMPT_TEMPLATE = """
-You are an expert administrative assistant working for NoBrokerHood (NBH) responsible for parsing meeting titles of meetings between NBH and different companies to extract key business information about those companies.
-Your task is to analyze the provided meeting title and return a JSON object with three specific keys: "brand_name", "industry", and "sub_category_keywords".
+You are an expert administrative assistant working for NoBrokerHood (NBH) responsible for parsing meeting titles between NBH and external companies.
 
-Follow these rules precisely:
-1.  **brand_name**: Identify the primary brand or company being met. If a title follows the pattern 'Parent Company (Brand)', the 'Brand' inside the parentheses is the primary `brand_name`. The parent company should be ignored for this task.
-2.  **industry**: Infer the most likely industry for the primary `brand_name` strictly from **Allowed_Industries** mentioned below.
-3.  **sub_category_keywords**: Provide a list of 4 to 6 highly specific product category keywords AND direct competitor brand names in India. This is CRITICAL for finding like-to-like case studies.
-4.  If the title is ambiguous or you cannot identify a clear brand, return "Unknown" for all fields.
-5.  Your response MUST be ONLY the JSON object, with no other text or markdown fences.
+Target Title: "{MEETING_TITLE}"
 
-Allowed_Industries: {Allowed_Industries}
----
-Here are some examples:
+Your task is to analyze the meeting title and extract information about the target company or brand.
 
-Title: "TCPL (Tetley) X NoBrokerHood/Partnership, 11am"
+CRITICAL RULES FOR AGENCY MEETINGS vs DIRECT BRAND MEETINGS:
+1. **Identify Media/Advertising Agencies**:
+   Known Agencies in India include: WPP, GroupM, Mindshare, Wavemaker, EssenceMediacom, Publicis, Havas, PivotRoots, OMD, Omnicom, Starcom, Zenith, Dentsu, Lyxel & Flamingo, LS Digital, Madison, Interactive Avenues, Hiveminds, OAP India.
+
+2. **Rule A - Agency Title WITH Client Brand** (e.g., "WPP (Prime Video) X NBH", "Dentsu - Maruti Suzuki x NBH"):
+   - `is_agency_meeting`: true
+   - `agency_name`: The Agency Name (e.g., "WPP" or "Dentsu")
+   - `brand_name`: The specific client brand inside parentheses or title (e.g., "Prime Video" or "Maruti Suzuki")
+   - `industry`: Infer industry of the client brand (e.g., "OTT" or "Automotive & Transportation")
+
+3. **Rule B - Agency Title WITHOUT Any Specific Client Brand** (e.g., "In-Person | Dentsu x NBH", "WPP || NoBrokerHood", "Publicis x NBH"):
+   - `is_agency_meeting`: true
+   - `agency_name`: The Agency Name (e.g., "Dentsu", "WPP", "Publicis")
+   - `brand_name`: DO NOT set brand_name to the Agency itself! Instead, identify a major, highly-recognized consumer client brand in India handled by this agency's portfolio (e.g., For Dentsu: "Toyota" or "Maruti Suzuki"; For WPP/GroupM/Mindshare: "Cadbury" or "Tata Motors"; For Publicis: "L'Oreal" or "Nestle"; For Havas: "Reckitt" or "Citroen").
+   - `industry`: Infer industry of that selected portfolio client brand.
+
+4. **Rule C - Direct Brand Meeting** (e.g., "Harpic x NBH", "GIVA Digital discussion"):
+   - `is_agency_meeting`: false
+   - `agency_name`: "N/A"
+   - `brand_name`: The primary brand being met (e.g., "Harpic", "Giva").
+
+5. **sub_category_keywords**: Provide 4 to 6 specific keywords/competitor brands in India for the `brand_name`.
+6. **industry**: Choose strictly from **Allowed_Industries**: {Allowed_Industries}
+
+Return ONLY a JSON object matching this schema:
 {{
-  "brand_name": "Tetley",
-  "industry": "Food & Beverage",
-  "sub_category_keywords":["tea", "green tea", "beverage", "lipton", "taj mahal", "wagh bakri"]
+  "brand_name": "...",
+  "industry": "...",
+  "sub_category_keywords": ["..."],
+  "is_agency_meeting": true/false,
+  "agency_name": "..."
 }}
-
-Title: "Campaign Discussion | Harpic x NBH, 5pm"
-{{
-  "brand_name": "Harpic",
-  "industry": "FMCG",
-  "sub_category_keywords":["toilet cleaner", "home care", "surface cleaner", "lizol", "domex", "mr muscle"]
-}}
-
-Title: "NBH X GIVA Digital _ June Discussion, 12pm"
-{{
-  "brand_name": "Giva",
-  "industry": "Jewellery",
-  "sub_category_keywords":["silver jewellery", "accessories", "caratlane", "bluestone", "mia by tanishq"]
-}}
-
-Title: "Internal Team Sync"
-{{
-  "brand_name": "Unknown",
-  "industry": "Unknown",
-  "sub_category_keywords":[]
-}}
----
-
-Now, analyze the following title:
-
-Title: "{MEETING_TITLE}"
 """
 
 def get_brand_details_from_title_with_llm(gemini_llm_client, meeting_title):
     """
-    Uses a single LLM call to extract brand name and industry from a meeting title.
-    Returns a dictionary with the extracted info or defaults if parsing fails.
+    Uses LLM to extract brand details, dynamically detecting agency meetings 
+    and selecting a representative portfolio brand when only an agency is named.
     """
     default_response = {
         "brand_name": "Unknown Brand",
-        "industry": "Unknown"
+        "industry": "Unknown",
+        "sub_category_keywords": [],
+        "is_agency_meeting": False,
+        "agency_name": "N/A"
     }
     if not gemini_llm_client:
         print("  LLM model not available for brand extraction.")
         return default_response
 
-    prompt = BRAND_EXTRACTION_PROMPT_TEMPLATE.format(MEETING_TITLE=meeting_title, Allowed_Industries=Allowed_Industries)
-
-    # Define the grounding tool
-    grounding_tool = types.Tool(
-        google_search=types.GoogleSearch()
+    prompt = BRAND_EXTRACTION_PROMPT_TEMPLATE.format(
+        MEETING_TITLE=meeting_title, 
+        Allowed_Industries=Allowed_Industries
     )
 
-    # Configure generation settings
-    config = types.GenerateContentConfig(
-        tools=[grounding_tool]
-    )
+    grounding_tool = types.Tool(google_search=types.GoogleSearch())
+    config = types.GenerateContentConfig(tools=[grounding_tool])
+
     try:
-        raw_text = "" # <-- ADD THIS LINE
-        response = gemini_llm_client.models.generate_content(model="gemini-2.5-flash",contents=prompt, config=config)
+        raw_text = ""
+        response = gemini_llm_client.models.generate_content(
+            model="gemini-2.5-flash", 
+            contents=prompt, 
+            config=config
+        )
         raw_text = response.candidates[0].content.parts[0].text
 
         cleaned_json_str = re.sub(r'```json\s*|\s*```', '', raw_text).strip()
         data = json.loads(cleaned_json_str)
 
-        # Validate the simplified response structure
         if "brand_name" in data and "industry" in data:
+            extracted_brand = str(data.get("brand_name", "")).strip().lower()
+            
+            # Python Safety Net: If LLM still returned an agency name as brand_name
+            is_agency_hit = any(agency in extracted_brand for agency in KNOWN_AGENCIES_LIST)
+            
+            if is_agency_hit:
+                print(f"  ⚠️ LLM extracted agency '{extracted_brand}' as brand. Overriding with portfolio brand logic...")
+                data["is_agency_meeting"] = True
+                data["agency_name"] = extracted_brand.title()
+                
+                # Direct portfolio mapping for fallback
+                agency_portfolio_fallback = {
+                    "dentsu": ("Maruti Suzuki", "Automotive & Transportation", ["cars", "suv", "hyundai", "tata motors"]),
+                    "wpp": ("Cadbury", "FMCG", ["chocolates", "confectionery", "nestle", "amul"]),
+                    "wpp media": ("Cadbury", "FMCG", ["chocolates", "confectionery", "nestle", "amul"]),
+                    "groupm": ("Tata Motors", "Automotive & Transportation", ["cars", "ev", "mahindra", "hyundai"]),
+                    "mindshare": ("Unilever", "FMCG", ["personal care", "home care", "p&g", "itc"]),
+                    "wavemaker": ("L'Oreal", "Beauty & Personal Care", ["shampoo", "skincare", "maybelline", "lakme"]),
+                    "essencemediacom": ("Google", "Technology & Business Services", ["search", "pixel", "tech", "android"]),
+                    "publicis": ("Nestle", "Food & Beverage", ["coffee", "noodles", "maggie", "britannia"]),
+                    "publicis media": ("Nestle", "Food & Beverage", ["coffee", "noodles", "maggie", "britannia"]),
+                    "havas": ("Reckitt", "FMCG", ["dettol", "harpic", "lizol", "savlon"]),
+                    "havas media": ("Reckitt", "FMCG", ["dettol", "harpic", "lizol", "savlon"]),
+                    "madison": ("Godrej", "FMCG", ["soap", "home care", "dabur", "marico"]),
+                    "madison media": ("Godrej", "FMCG", ["soap", "home care", "dabur", "marico"]),
+                    "omd": ("Apple", "Home Goods & Electronics", ["iphone", "macbook", "samsung", "oneplus"]),
+                    "omnicom": ("Apple", "Home Goods & Electronics", ["iphone", "macbook", "samsung", "oneplus"]),
+                    "omnicom media group": ("Apple", "Home Goods & Electronics", ["iphone", "macbook", "samsung", "oneplus"]),
+                    "pivotroots": ("Amazon", "E-Commerce", ["shopping", "delivery", "prime", "flipkart"]),
+                    "starcom": ("Samsung", "Home Goods & Electronics", ["smartphones", "tv", "appliances", "lg"]),
+                    "zenith": ("Disney+ Hotstar", "OTT", ["streaming", "movies", "ipl", "netflix"])
+                }
+                
+                matched = None
+                for key, val in agency_portfolio_fallback.items():
+                    if key in extracted_brand:
+                        matched = val
+                        break
+                
+                if not matched:
+                    # Generic high-performing fallback for any unspecified agency
+                    matched = ("Cadbury", "FMCG", ["chocolates", "confectionery", "nestle", "amul"])
+
+                data["brand_name"] = matched[0]
+                data["industry"] = matched[1]
+                data["sub_category_keywords"] = matched[2]
+
             if not data["brand_name"] or data["brand_name"].lower() == 'unknown':
                 print(f"  LLM identified title '{meeting_title}' as ambiguous.")
                 return default_response
             return data
-        else:
-            print(f"  Error: LLM response for '{meeting_title}' was missing 'brand_name' or 'industry'.")
-            return default_response
 
-    except (json.JSONDecodeError, IndexError, AttributeError, Exception) as e:
-        print(f"⚠️ First pass failed ({e}), retrying with strict JSON schema…")
-
-        # Build a cleanup prompt + strict JSON enforcement (no tools)
-        cleanup_prompt = (
-            "The text below is supposed to be a JSON object matching this schema:\n\n"
-            f"{json.dumps(Brand_Details.model_json_schema(), indent=2)}\n\n"
-            "But it wasn’t valid JSON. Please reformat exactly as JSON (no extra text):\n\n"
-            f"{raw_text}"
-        )
-
-        cleanup_config = types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=Brand_Details
-        )
-        retry = gemini_llm_client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=cleanup_prompt,
-            config=cleanup_config
-        )
-
-        # the SDK will give you a .parsed attribute when you supply response_schema
-        try:
-            parsed: Brand_Details = retry.parsed
-            return parsed.model_dump()   # or parsed.dict()
-        except Exception as e2:
-            print(f"❌ Retry still failed: {e2}")
-            return default_response
+        return default_response
 
     except Exception as e:
-        # anything else
-        print(f"❌ Unexpected error: {e}")
-        return default_response
+        print(f"⚠️ First pass failed ({e}), retrying with strict JSON schema…")
+        try:
+            cleanup_prompt = (
+                "Reformat the text below into valid JSON matching this schema:\n\n"
+                f"{json.dumps(Brand_Details.model_json_schema(), indent=2)}\n\n"
+                f"{raw_text}"
+            )
+            cleanup_config = types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=Brand_Details
+            )
+            retry = gemini_llm_client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=cleanup_prompt,
+                config=cleanup_config
+            )
+            parsed: Brand_Details = retry.parsed
+            return parsed.model_dump()
+        except Exception as e2:
+            print(f"❌ Retry failed: {e2}")
+            return default_response
 
 
 # --- Google Authentication and Service Building ---
@@ -2628,6 +2670,10 @@ def main():
 
         # Step 7: Merge the successful LLM results into the main meeting_data dictionary
         meeting_data.update(brand_details)
+
+        # Log Agency vs Direct Brand Context
+        if meeting_data.get('is_agency_meeting'):
+            print(f"  🏢 AGENCY MEETING DETECTED ({meeting_data.get('agency_name')}). Pitching with portfolio brand: '{meeting_data['brand_name']}'")
 
         # ========== NEW CODE STARTS HERE ==========
         # Get LinkedIn profiles for brand attendees using Serper
