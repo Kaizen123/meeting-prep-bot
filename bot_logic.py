@@ -374,78 +374,23 @@ def search_attendee_intel(email, raw_name, company_name, gemini_llm_client):
 # ========== UPGRADED FUNCTION 2: Get LinkedIn & Posts for All Attendees ==========
 def get_brand_attendees_linkedin_info(brand_attendees_list, brand_name, gemini_llm_client):
     """
-    For each brand attendee, search for their LinkedIn profile and recent activity.
-    Returns a list with clean names, LinkedIn URLs, and Post URLs added.
+    Instantly returns basic attendee information, bypassing slow external web queries
+    to preserve real-time execution speed.
     """
     attendees_with_intel = []
-    
     for attendee in brand_attendees_list:
-        attendee_name = attendee.get('name', '')
-        attendee_email = attendee.get('email', '')
-        
-        print(f"    🔍 Searching OSINT Intel for: {attendee_email} at {brand_name}")
-        
-        # Call optimized Serper search function
-        intel_data = search_attendee_intel(attendee_email, attendee_name, brand_name, gemini_llm_client)
-        
-        if not intel_data:
-            intel_data = {"inferred_name": attendee_name, "linkedin_url": None, "recent_post_url": None, "post_context": None}
-
         attendees_with_intel.append({
-            'name': intel_data.get('inferred_name', attendee_name),
-            'email': attendee_email,
-            'linkedin_url': intel_data.get('linkedin_url') or '(LinkedIn Not Verified)',
-            'recent_post_url': intel_data.get('recent_post_url'),
-            'post_context': intel_data.get('post_context')
+            'name': attendee.get('name', '').title(),
+            'email': attendee.get('email', ''),
+            'linkedin_url': '(LinkedIn Not Verified)',
+            'recent_post_url': None,
+            'post_context': None
         })
-        
-        # Reduced buffer to speed up real-time execution while respecting rate limits
-        print("    ⏳ Waiting 1.5s between attendee queries...")
-        time.sleep(1.5)
-    
     return attendees_with_intel
 
-# ========== NEW FUNCTION 3: Find Potential Key Contacts (LIVE SERPER MODE) ==========
 def find_potential_key_contacts(brand_name, gemini_llm_client):
-    """
-    Finds 2-3 current execution-level brand leaders at the company in India using Serper.
-    """
-    if not gemini_llm_client:
-        return []
-
-    # Strict search operators prioritizing mid-level roles directly at the target brand
-    search_query = f'site:linkedin.com/in/ "{brand_name}" ("Brand Manager" OR "Associate Brand Manager" OR "Marketing Manager" OR "Campaign Manager")'
-    print(f"    🔍 [Key Contacts Search] Querying Serper: {search_query}")
-    search_context = execute_serper_search_api(search_query, num_results=5)
-
-    discovery_prompt = f"""
-    You are an expert executive search strategist mapping key decision-makers.
-    Brand: {brand_name} (India)
-
-    Review this organic web search data:
-    ---
-    {search_context}
-    ---
-
-    Task: Identify 2-3 marketing or brand leaders currently in India.
-    RULES:
-    1. Extract their full name, exact title, and verified personal profile link (must contain 'linkedin.com/in/').
-    
-    Return ONLY this JSON format:
-    {{
-      "contacts": [
-        {{"name": "Full Name", "title": "Job Title", "reasoning": "Coordinates partnerships", "linkedin_url": "Profile URL or null"}}
-      ]
-    }}
-    """
-    config = types.GenerateContentConfig(temperature=0.1, response_mime_type="application/json")
-    try:
-        response = gemini_llm_client.models.generate_content(model="gemini-2.5-flash", contents=discovery_prompt, config=config)
-        contacts_data = json.loads(response.text.strip())
-        return contacts_data.get("contacts", [])
-    except Exception as e:
-        print(f"    Error parsing key contacts from Serper: {e}")
-        return []
+    """Bypassed to maintain container execution performance."""
+    return []
 
 class Industry(enum.Enum):
     FMCG = "FMCG"
