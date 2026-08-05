@@ -1753,13 +1753,12 @@ def get_brand_visual_context(gemini_client, brand_name, industry, generated_brie
         print(f"  Visual context extraction failed for {brand_name}: {e}")
         return None
 
-from playwright.sync_api import sync_playwright
-
 def generate_creative_with_gemini_image(gemini_client, brand_name, industry, visual_context):
     """
     Generates a professional 3-panel side-by-side marketing funnel mockup collage.
     - Panel 1 and Panel 2 retain strictly static, brand-agnostic marketing funnel captions.
     - Panel 3 applies dynamic captions specific to the brand's industry and conversion goal.
+    Uses the direct Gemini API paid model for execution.
     """
     if not visual_context:
         print(f"  Skipping image generation for {brand_name}: Visual context was not extracted.")
@@ -1833,12 +1832,6 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
       "{caption_p3}"
     """
     
-    api_successful = False
-    raw_data = None
-
-    # =====================================================================
-    # ATTEMPT 1: DIRECT API GENERATION (PRIMARY / DEFAULT PRODUCTION ENGINE)
-    # =====================================================================
     print(f"  🎨 Generating image using primary Gemini API model 'gemini-3-pro-image-preview'...")
     try:
         response = gemini_client.models.generate_content(
@@ -1861,77 +1854,10 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
                             raw_data = base64.b64decode(raw_data)
                     
                     print(f"  ✅ Primary API image generation successful for {brand_name}.")
-                    api_successful = True
                     return raw_data
 
     except Exception as api_err:
-        print(f"  ⚠️ Primary API generation failed or limits exceeded: {api_err}. Transitioning to Playwright fallback...")
-
-    # =====================================================================
-    # ATTEMPT 2: GOOGLE FLOW WEB AUTOMATION (SECONDARY / BACKUP OPTION)
-    # =====================================================================
-    if not api_successful:
-        login_url = os.getenv("FLOW_LOGIN_URL")
-        username = os.getenv("FLOW_USERNAME")
-        password = os.getenv("FLOW_PASSWORD")
-        auth_state_file = "flow_auth_state.json"
-        flow_prompt = f"Generate this visual setup for the brand '{brand_name}': {image_prompt}"
-
-        if os.path.exists(auth_state_file):
-            print(f"  🎬 Launching Playwright browser to generate mockup on Google Flow...")
-            try:
-                with sync_playwright() as p:
-                    browser = p.chromium.launch(headless=True)
-                    context = browser.new_context(storage_state=auth_state_file)
-                    page = context.new_page()
-                    
-                    page.set_viewport_size({"width": 1280, "height": 800})
-                    page.goto("https://labs.google/fx/tools/flow", wait_until="networkidle", timeout=45000)
-                    
-                    # Verify login state
-                    if "signin" in page.url or page.locator("text=Choose an account").is_visible():
-                        print("  ❌ Session expired. Please regenerate your 'flow_auth_state.json' file locally.")
-                        browser.close()
-                        raise Exception("Session expired.")
-                    
-                    print("    ➕ Creating a new workspace project...")
-                    page.locator("text=New project").click()
-                    page.wait_for_load_state("networkidle")
-                    
-                    if page.locator("text=Got it").is_visible():
-                        page.locator("text=Got it").click()
-                    
-                    prompt_input_selector = "textarea[placeholder*='What do you want to create']"
-                    page.wait_for_selector(prompt_input_selector, timeout=15000)
-                    
-                    print("    📝 Entering design instructions into the canvas input...")
-                    page.fill(prompt_input_selector, flow_prompt)
-                    page.press(prompt_input_selector, "Enter")
-                    
-                    print("    ⏳ Prompt submitted. Rendering canvas (up to 120s)...")
-                    output_image_selector = "div[class*='media-card'] img, div[class*='image'] img"
-                    page.wait_for_selector(output_image_selector, timeout=120000)
-                    
-                    img_srcs = page.locator("img").all_get_attributes("src")
-                    browser.close()
-                    
-                    valid_src = None
-                    for src in img_srcs:
-                        if src and ("googleusercontent.com" in src or "labs.google" in src):
-                            valid_src = src
-                            break
-                    
-                    if valid_src:
-                        img_res = requests.get(valid_src, timeout=15)
-                        if img_res.status_code == 200:
-                            raw_data = img_res.content
-                            print(f"  ✅ Web UI image generated successfully via Google Flow!")
-                            return raw_data
-                            
-            except Exception as automation_err:
-                print(f"  ⚠️ Google Flow Web Automation failed: {automation_err}")
-        else:
-            print("  ⚠️ 'flow_auth_state.json' file missing. Bypassing automation fallback.")
+        print(f"  ⚠️ Primary API generation failed: {api_err}")
 
     return None
 # --- Email Sending ---
