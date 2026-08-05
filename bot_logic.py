@@ -1079,9 +1079,9 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
                  if len(p) > 2: current_nbh_tokens.add(p)
 
     try:
-        header_req = sheets_service.spreadsheets().values().get(spreadsheetId=master_sheet_id, range="Meeting_data!A1:AZ1").execute()
+        header_req = sheets_service.spreadsheets().values().get(spreadsheetId=master_sheet_id, range="Meeting_data!A1:T1").execute()
         headers = header_req.get('values', [])[0]
-        lower_headers =[str(h).strip().lower() for h in headers]
+        lower_headers = [str(h).strip().lower() for h in headers]
         
         try:
             col_brand = lower_headers.index("brand name")
@@ -1092,7 +1092,7 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
         except:
              history_context_str = "## PREVIOUS MEETING INTELLIGENCE: NONE (Fresh Meeting)\n"
         else:
-            data_req = sheets_service.spreadsheets().values().get(spreadsheetId=master_sheet_id, range="Meeting_data!A2:AZ").execute()
+            data_req = sheets_service.spreadsheets().values().get(spreadsheetId=master_sheet_id, range="Meeting_data!A2:T").execute()
             data_rows = data_req.get('values', [])
             found_meetings =[]
             target_clean = current_target_brand_name.lower().strip()
