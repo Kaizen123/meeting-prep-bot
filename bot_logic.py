@@ -1921,7 +1921,7 @@ def send_unknown_brand_sop_email(gmail_service, meeting_data):
     cc_list = [email for email in cc_list if email.lower() != organizer]
 
     meeting_date_str = meeting_data.get('start_time_str', 'N/A')
-    email_subject = f"Brand Unidentified: {meeting_title}"
+    email_subject = f"Notice: Pre-Meeting Brief & Event ID Not Generated for \"{meeting_title}\""
 
     # Clean Google Card Styled Email Template
     email_body_html = f"""
@@ -1993,7 +1993,7 @@ def send_unknown_brand_sop_email(gmail_service, meeting_data):
             line-height: 1.6;
         }}
         .bullet-list li {{
-            margin-bottom: 8px;
+            margin-bottom: 9px;
         }}
         .highlight-code {{
             background-color: #f1f3f4;
@@ -2011,10 +2011,11 @@ def send_unknown_brand_sop_email(gmail_service, meeting_data):
             line-height: 1.5;
         }}
         .footer-logo {{
-            font-size: 16px;
+            font-size: 15px;
             font-weight: bold;
             color: #1a73e8;
             margin-bottom: 6px;
+            letter-spacing: 0.3px;
         }}
         .footer-logo span {{
             color: #ea4335;
@@ -2026,7 +2027,7 @@ def send_unknown_brand_sop_email(gmail_service, meeting_data):
             <!-- Google Blue Header Banner -->
             <div class="top-banner">
                 <div class="banner-title">
-                    🔍 <em>Title scanned:</em> <strong>{meeting_title}</strong>
+                    🔍 <em>Scanned Invite:</em> <strong>{meeting_title}</strong>
                 </div>
                 <div class="banner-pill">
                     ACTION NEEDED
@@ -2035,23 +2036,23 @@ def send_unknown_brand_sop_email(gmail_service, meeting_data):
 
             <!-- Content Card -->
             <div class="content-body">
-                <div class="item-headline">Brand Unidentified in Calendar Invite</div>
-                <div class="item-subtext">NoBrokerHood Intelligence Bot · {meeting_date_str}</div>
+                <div class="item-headline">Pre-Meeting Brief & Event ID Not Generated</div>
+                <div class="item-subtext">NBH Meeting Prep Agent · {meeting_date_str}</div>
 
                 <ul class="bullet-list">
-                    <li><strong>Status:</strong> Brand name could not be identified from the title (logged as <em>Unknown Brand</em>).</li>
-                    <li><strong>Policy:</strong> Pre-meeting brief was <strong>not generated</strong>, and the <strong>Event ID is withheld</strong> (not eligible for meeting credit or rebuttals).</li>
-                    <li><strong>Standard Naming:</strong> <span class="highlight-code">Brand Name X NoBrokerHood</span> (e.g., <em>Mia by Tanishq X NBH</em>).</li>
-                    <li><strong>Regional / Sub-Brand:</strong> <span class="highlight-code">Parent Company (Brand Name) X NBH</span> (e.g., <em>TCPL (Tetley Tea) X NBH</em>).</li>
+                    <li><strong>What Happened:</strong> The AI bot scanned your calendar invite, but could not recognize the brand name from the title (logged as <em>Unknown Brand</em>).</li>
+                    <li><strong>Impact on Meeting:</strong> Without an identified brand, <strong>no Pre-Meeting Brief is generated</strong>, and the <strong>Event ID is withheld</strong> (this meeting will not be eligible for meeting credits or rebuttals).</li>
+                    <li><strong>How to Fix (Standard Brands):</strong> Title your invite clearly as <span class="highlight-code">Brand Name X NoBrokerHood</span> (e.g., <em>Mia by Tanishq X NBH</em>).</li>
+                    <li><strong>For Regional / Lesser-Known Brands:</strong> Add the parent company or category in parentheses: <span class="highlight-code">Parent Company (Brand Name) X NBH</span> (e.g., <em>TCPL (Tetley Tea) X NBH</em>).</li>
                 </ul>
             </div>
         </div>
 
         <!-- Footer -->
         <div class="footer-area">
-            <div class="footer-logo">NoBroker<span>Hood</span> Intelligence</div>
-            You're receiving this notification because you organized a meeting with an unidentified brand title.<br>
-            <em>If the brand name was clearly mentioned and the AI missed it, reply to this thread to escalate for audit.</em>
+            <div class="footer-logo">NBH <span>Meeting Prep</span> Intelligence</div>
+            You are receiving this notification because you are the organizer of this meeting.<br>
+            <em>If this is a valid brand name that the AI failed to recognize, please reply directly to this email to escalate for manual audit.</em>
         </div>
     </body>
     </html>
