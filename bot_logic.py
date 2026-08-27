@@ -1490,6 +1490,8 @@ def extract_meeting_info(event, agent_email_global, nbh_service_accounts_to_excl
     #     print(f"  Skipping event '{summary}': No external attendees.")
     #     return "NO_EXTERNAL_ATTENDEES"
 
+    organizer_email = event.get('organizer', {}).get('email', '').strip().lower()
+
     return {
         'id': event_id,
         'title': summary, # Return the raw title
@@ -1499,6 +1501,7 @@ def extract_meeting_info(event, agent_email_global, nbh_service_accounts_to_excl
         'description': description,
         'nbh_attendees': nbh_attendees,
         'brand_attendees_info': brand_attendees_info,
+        'organizer_email': organizer_email,
         'is_event_description_present_for_tagging': bool(event.get('description'))
     }
 
@@ -1806,10 +1809,12 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
 
     return None
 # --- Email Sending ---
-def create_email_message_with_image(sender, to_emails_list, subject, message_text_html, image_bytes=None, brand_name=None):
+def create_email_message_with_image(sender, to_emails_list, subject, message_text_html, image_bytes=None, brand_name=None, cc_emails_list=None):
     """Creates an email message, assigning a clear, custom filename to attachments to prevent 'noname' display."""
     msg = EmailMessage()
     msg["To"] = ", ".join(to_emails_list)
+    if cc_emails_list:
+        msg["Cc"] = ", ".join(cc_emails_list)
     msg["From"] = sender
     msg["Subject"] = subject
 
@@ -1851,6 +1856,133 @@ def send_gmail_message(gmail_service, user_id, message_body):
         print(f'  An error occurred sending email: {error}')
         return None
 
+# =====================================================================
+# INTERNAL MEETING FILTER & SHORT SOP NOTIFICATION
+# =====================================================================
+def is_internal_meeting(meeting_data):
+    """
+    Checks if a meeting is an internal team sync rather than a client meeting.
+    Skips sending SOP notices for huddles, reviews, weekly connects, etc.
+    """
+    title = meeting_data.get('title', '').lower().strip()
+    brand_attendees = meeting_data.get('brand_attendees_info', [])
+
+    # Rule 1: Zero external/client attendees = 100% Internal meeting
+    if not brand_attendees:
+        return True
+
+    # Rule 2: Common internal meeting keywords
+    internal_keywords = [
+        'huddle', 'weekly connect', 'catch-up', 'catch up', 'catchup',
+        'internal sync', 'team sync', 'review x', 'hurdle', 'status check',
+        'execution discussion', 'ho -', '1:1', 'one on one', 'ic_connect',
+        'all hands', 'standup', 'stand-up'
+    ]
+    if any(kw in title for kw in internal_keywords):
+        return True
+
+    return False
+
+
+def send_unknown_brand_sop_email(gmail_service, meeting_data):
+    """
+    Sends a short, crisp SOP notice ONLY to the meeting Organizer,
+    with Olivia, Bhargav, and Sathish in CC.
+    Ignores internal meetings and respects (Testing) mode.
+    """
+    # 1. Skip if it's an internal meeting
+    if is_internal_meeting(meeting_data):
+        print(f"  ⏭️ Skipping SOP email: '{meeting_data.get('title')}' is identified as an internal team meeting.")
+        return
+
+    meeting_title = meeting_data.get('title', 'Untitled Meeting')
+    
+    # 2. Testing mode filter: Only triggers if '(testing)' is in the title
+    REQUIRE_TESTING_TAG = True
+    if REQUIRE_TESTING_TAG:
+        if "(testing)" not in meeting_title.lower():
+            print(f"  🧪 [TEST MODE] Skipping Unknown Brand SOP email for '{meeting_title}' (No '(testing)' in title).")
+            return
+
+    # 3. Target Organizer only
+    organizer = meeting_data.get('organizer_email', '').strip().lower()
+    
+    # Fallback to first NBH attendee if organizer email is missing or a service account
+    if not organizer or organizer in NBH_SERVICE_ACCOUNTS_TO_EXCLUDE or '@nobroker.in' not in organizer:
+        nbh_attendees = meeting_data.get('nbh_attendees', [])
+        if nbh_attendees:
+            organizer = nbh_attendees[0].get('email', '').strip().lower()
+
+    if not organizer or '@nobroker.in' not in organizer:
+        print(f"  No valid NBH Organizer found for '{meeting_title}'. Skipping SOP email.")
+        return
+
+    cc_list = ["olivia.saha@nobroker.in", "bhargav.s@nobroker.in", "sathish.v2@nobroker.in"]
+    # Filter out organizer from CC if they are in the CC list
+    cc_list = [email for email in cc_list if email.lower() != organizer]
+
+    meeting_date_str = meeting_data.get('start_time_str', 'N/A')
+    email_subject = f"Meeting Naming Notice: Brand Unidentified for \"{meeting_title}\""
+
+    email_body_html = f"""
+    <html>
+    <head>
+    <style>
+        body {{ font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #2d3748; line-height: 1.5; background-color: #f4f7f6; padding: 20px; margin: 0; }}
+        .email-container {{ max-width: 650px; margin: 0 auto; background-color: #ffffff; padding: 28px; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.04); }}
+        .main-title {{ color: #0066cc; font-size: 17px; font-weight: bold; text-transform: uppercase; border-bottom: 2px solid #0066cc; padding-bottom: 8px; margin-bottom: 18px; }}
+        .details-card {{ background-color: #f8fafc; border-left: 4px solid #e53e3e; border-radius: 4px; padding: 12px 16px; margin: 15px 0; font-size: 13.5px; }}
+        .alert-box {{ background-color: #fff5f5; border: 1px solid #fed7d7; border-radius: 6px; padding: 12px 16px; color: #9b2c2c; font-size: 13.5px; margin-bottom: 15px; }}
+        .sop-box {{ background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 12px 16px; color: #166534; font-size: 13px; margin: 15px 0; }}
+        .footer {{ margin-top: 25px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 12.5px; color: #718096; }}
+    </style>
+    </head>
+    <body>
+        <div class="email-container">
+            <div class="main-title">NBH Intelligence Bot — Brand Unidentified</div>
+            
+            <p style="font-size: 14px; margin-top: 0;">Hi Organizer,</p>
+            <p style="font-size: 13.5px;">The intelligence bot scanned your calendar invite, but the <strong>Brand Name could not be recognized</strong> from the meeting title.</p>
+
+            <div class="details-card">
+                <strong>Meeting Title:</strong> {meeting_title}<br>
+                <strong>Date & Time:</strong> {meeting_date_str}<br>
+                <strong>Status:</strong> <span style="color: #e53e3e; font-weight: bold;">Unknown Brand</span>
+            </div>
+
+            <div class="alert-box">
+                ⚠️ <strong>Policy Notice:</strong> Because this meeting is marked as <em>Unknown Brand</em>, <strong>no Pre-Meeting Brief is generated</strong>, and the <strong>Event ID is withheld</strong> (not eligible for meeting credit or rebuttals).
+            </div>
+
+            <div class="sop-box">
+                📌 <strong>Correct Naming SOP:</strong><br>
+                • <strong>Standard Brand:</strong> <code>Brand Name X NoBrokerHood</code> (e.g., <em>Mia by Tanishq X NBH</em>)<br>
+                • <strong>Regional / Lesser-known:</strong> <code>Parent Company (Brand Name) X NBH</code> (e.g., <em>TCPL (Tetley Tea) X NBH</em>)
+            </div>
+
+            <p style="font-size: 12.5px; color: #718096; margin-bottom: 0;">
+                <em>Note: If the title accurately used a valid brand name and the AI missed it, reply to this thread to escalate for manual audit.</em>
+            </p>
+
+            <div class="footer">
+                Best regards,<br><strong>NBH Monetization & Intelligence Team</strong>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    email_message = create_email_message_with_image(
+        sender=AGENT_EMAIL,
+        to_emails_list=[organizer],
+        subject=email_subject,
+        message_text_html=email_body_html,
+        image_bytes=None,
+        brand_name="Unknown",
+        cc_emails_list=cc_list
+    )
+    print(f"  📤 Sending Unknown Brand SOP Email for '{meeting_title}' TO Organizer: [{organizer}] | CC: {cc_list}")
+    send_gmail_message(gmail_service, 'me', email_message)
 def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_bytes=None):
     """Sends the brief email, injecting the AI creative if available. Includes TEST MODE."""
     EXCLUDED_EMAILS = {AGENT_EMAIL.lower(), "pia.brand@nobroker.in", "pia.hood@nobroker.in", "meetings.regional@gmail.com"} 
@@ -2459,15 +2591,18 @@ def main():
         # Step 6: Handle ambiguous result from the LLM
         if brand_details['brand_name'] == 'Unknown Brand' or brand_details['brand_name'].lower() == 'unknown':
             print(f"  Event '{meeting_data['title']}': Title is ambiguous for brand extraction by LLM.")
-            # Your notification logic for ambiguous titles can go here if needed.
-            # Example:
-            # ambiguous_body_html = f"..."
-            # send_notification_email(...)
+            
+            # --- 🚀 TRIGGER SOP EMAIL ONLY TO ORGANIZER + CC LIST (IF NOT INTERNAL MEETING) ---
+            send_unknown_brand_sop_email(gmail_service, meeting_data)
+            # -----------------------------------------------------------------------------------
+
             save_processed_event_id(event_id)
             tag_event_as_processed(calendar_service, event_id) # Tag it so we don't retry
+            set_one_hour_email_reminder(calendar_service, event_id) # Set 1hr email reminder
+            
             # Updating the unknown brand name and industry in the master sheet
             index_of_event = updated_meeting_ids.index([event_id]) + 2 # +2 because A1 is header and A2 is first data row
-            print(f"  Updating master sheet for event ID '{event_id}' at row {index_of_event} with brand 'Unknown")
+            print(f"  Updating master sheet for event ID '{event_id}' at row {index_of_event} with brand 'Unknown'")
             update_values = [[brand_details['brand_name'], brand_details['industry']]]
             body = {
             "valueInputOption": 'USER_ENTERED',  # Use USER_ENTERED to allow date formatting
