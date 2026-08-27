@@ -1886,7 +1886,7 @@ def is_internal_meeting(meeting_data):
 
 def send_unknown_brand_sop_email(gmail_service, meeting_data):
     """
-    Sends a short, crisp SOP notice ONLY to the meeting Organizer,
+    Sends a clean Google-styled card SOP notice ONLY to the meeting Organizer,
     with Olivia, Bhargav, and Sathish in CC.
     Ignores internal meetings and respects (Testing) mode.
     """
@@ -1918,55 +1918,140 @@ def send_unknown_brand_sop_email(gmail_service, meeting_data):
         return
 
     cc_list = ["olivia.saha@nobroker.in", "bhargav.s@nobroker.in", "sathish.v2@nobroker.in"]
-    # Filter out organizer from CC if they are in the CC list
     cc_list = [email for email in cc_list if email.lower() != organizer]
 
     meeting_date_str = meeting_data.get('start_time_str', 'N/A')
-    email_subject = f"Meeting Naming Notice: Brand Unidentified for \"{meeting_title}\""
+    email_subject = f"Brand Unidentified: {meeting_title}"
 
+    # Clean Google Card Styled Email Template
     email_body_html = f"""
+    <!DOCTYPE html>
     <html>
     <head>
     <style>
-        body {{ font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #2d3748; line-height: 1.5; background-color: #f4f7f6; padding: 20px; margin: 0; }}
-        .email-container {{ max-width: 650px; margin: 0 auto; background-color: #ffffff; padding: 28px; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.04); }}
-        .main-title {{ color: #0066cc; font-size: 17px; font-weight: bold; text-transform: uppercase; border-bottom: 2px solid #0066cc; padding-bottom: 8px; margin-bottom: 18px; }}
-        .details-card {{ background-color: #f8fafc; border-left: 4px solid #e53e3e; border-radius: 4px; padding: 12px 16px; margin: 15px 0; font-size: 13.5px; }}
-        .alert-box {{ background-color: #fff5f5; border: 1px solid #fed7d7; border-radius: 6px; padding: 12px 16px; color: #9b2c2c; font-size: 13.5px; margin-bottom: 15px; }}
-        .sop-box {{ background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 12px 16px; color: #166534; font-size: 13px; margin: 15px 0; }}
-        .footer {{ margin-top: 25px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 12.5px; color: #718096; }}
+        body {{
+            font-family: 'Roboto', 'Segoe UI', Helvetica, Arial, sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 30px 15px;
+            color: #3c4043;
+        }}
+        .card-wrapper {{
+            max-width: 620px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(60,64,67, 0.12), 0 1px 2px rgba(60,64,67, 0.24);
+            border: 1px solid #dadce0;
+        }}
+        .top-banner {{
+            background-color: #1a73e8;
+            color: #ffffff;
+            padding: 14px 24px;
+            display: table;
+            width: 100%;
+            box-sizing: border-box;
+        }}
+        .banner-title {{
+            display: table-cell;
+            vertical-align: middle;
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: 0.2px;
+        }}
+        .banner-pill {{
+            display: table-cell;
+            vertical-align: middle;
+            text-align: right;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #ffffff;
+        }}
+        .content-body {{
+            padding: 26px 30px 24px 30px;
+        }}
+        .item-headline {{
+            font-size: 17px;
+            font-weight: 600;
+            color: #1a73e8;
+            margin: 0 0 6px 0;
+            text-decoration: underline;
+        }}
+        .item-subtext {{
+            font-size: 13.5px;
+            color: #5f6368;
+            margin: 0 0 18px 0;
+        }}
+        .bullet-list {{
+            margin: 0;
+            padding-left: 20px;
+            color: #3c4043;
+            font-size: 13.5px;
+            line-height: 1.6;
+        }}
+        .bullet-list li {{
+            margin-bottom: 8px;
+        }}
+        .highlight-code {{
+            background-color: #f1f3f4;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 13px;
+            color: #202124;
+        }}
+        .footer-area {{
+            text-align: center;
+            padding: 20px 24px 28px 24px;
+            color: #5f6368;
+            font-size: 12px;
+            line-height: 1.5;
+        }}
+        .footer-logo {{
+            font-size: 16px;
+            font-weight: bold;
+            color: #1a73e8;
+            margin-bottom: 6px;
+        }}
+        .footer-logo span {{
+            color: #ea4335;
+        }}
     </style>
     </head>
     <body>
-        <div class="email-container">
-            <div class="main-title">NBH Intelligence Bot — Brand Unidentified</div>
-            
-            <p style="font-size: 14px; margin-top: 0;">Hi Organizer,</p>
-            <p style="font-size: 13.5px;">The intelligence bot scanned your calendar invite, but the <strong>Brand Name could not be recognized</strong> from the meeting title.</p>
-
-            <div class="details-card">
-                <strong>Meeting Title:</strong> {meeting_title}<br>
-                <strong>Date & Time:</strong> {meeting_date_str}<br>
-                <strong>Status:</strong> <span style="color: #e53e3e; font-weight: bold;">Unknown Brand</span>
+        <div class="card-wrapper">
+            <!-- Google Blue Header Banner -->
+            <div class="top-banner">
+                <div class="banner-title">
+                    🔍 <em>Title scanned:</em> <strong>{meeting_title}</strong>
+                </div>
+                <div class="banner-pill">
+                    ACTION NEEDED
+                </div>
             </div>
 
-            <div class="alert-box">
-                ⚠️ <strong>Policy Notice:</strong> Because this meeting is marked as <em>Unknown Brand</em>, <strong>no Pre-Meeting Brief is generated</strong>, and the <strong>Event ID is withheld</strong> (not eligible for meeting credit or rebuttals).
-            </div>
+            <!-- Content Card -->
+            <div class="content-body">
+                <div class="item-headline">Brand Unidentified in Calendar Invite</div>
+                <div class="item-subtext">NoBrokerHood Intelligence Bot · {meeting_date_str}</div>
 
-            <div class="sop-box">
-                📌 <strong>Correct Naming SOP:</strong><br>
-                • <strong>Standard Brand:</strong> <code>Brand Name X NoBrokerHood</code> (e.g., <em>Mia by Tanishq X NBH</em>)<br>
-                • <strong>Regional / Lesser-known:</strong> <code>Parent Company (Brand Name) X NBH</code> (e.g., <em>TCPL (Tetley Tea) X NBH</em>)
+                <ul class="bullet-list">
+                    <li><strong>Status:</strong> Brand name could not be identified from the title (logged as <em>Unknown Brand</em>).</li>
+                    <li><strong>Policy:</strong> Pre-meeting brief was <strong>not generated</strong>, and the <strong>Event ID is withheld</strong> (not eligible for meeting credit or rebuttals).</li>
+                    <li><strong>Standard Naming:</strong> <span class="highlight-code">Brand Name X NoBrokerHood</span> (e.g., <em>Mia by Tanishq X NBH</em>).</li>
+                    <li><strong>Regional / Sub-Brand:</strong> <span class="highlight-code">Parent Company (Brand Name) X NBH</span> (e.g., <em>TCPL (Tetley Tea) X NBH</em>).</li>
+                </ul>
             </div>
+        </div>
 
-            <p style="font-size: 12.5px; color: #718096; margin-bottom: 0;">
-                <em>Note: If the title accurately used a valid brand name and the AI missed it, reply to this thread to escalate for manual audit.</em>
-            </p>
-
-            <div class="footer">
-                Best regards,<br><strong>NBH Monetization & Intelligence Team</strong>
-            </div>
+        <!-- Footer -->
+        <div class="footer-area">
+            <div class="footer-logo">NoBroker<span>Hood</span> Intelligence</div>
+            You're receiving this notification because you organized a meeting with an unidentified brand title.<br>
+            <em>If the brand name was clearly mentioned and the AI missed it, reply to this thread to escalate for audit.</em>
         </div>
     </body>
     </html>
