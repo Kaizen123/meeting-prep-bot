@@ -1037,16 +1037,16 @@ def extract_strict_campaigns_and_case_studies(file_data_obj, fname, brand_clean,
     return final_output
 
 # ==============================================================================
-# HYBRID INTELLIGENCE ENGINE (Explicit us-central1 Location)
+# SUB-SECOND BIGQUERY INTELLIGENCE ENGINE (Auto-Detect Location)
 # ==============================================================================
-bq_client = bigquery.Client(location="us-central1")
+bq_client = bigquery.Client()
 
 def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_client, 
                                     current_target_brand_name, target_brand_industry, current_meeting_data, 
                                     EXCLUDED_NBH_PSEUDO_NAMES_FOR_FOLLOWUP, AGENT_EMAIL, master_sheet_id, email_to_geo_map=None):
     
     if email_to_geo_map is None: email_to_geo_map = {}
-    print(f"⚡ [Hybrid Intel] Fetching history from BigQuery & campaigns from Drive for: '{current_target_brand_name}'...")
+    print(f"⚡ [BigQuery Intel] Fetching meeting history for brand: '{current_target_brand_name}'...")
     
     # Determine Target Cities and Departments for Attendees
     target_cities = set()
@@ -1058,15 +1058,12 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
             if geo_info.get('city'): target_cities.add(geo_info['city'])
             if geo_info.get('dept'): target_depts.add(geo_info['dept'])
             
-    print(f"    🎯 Target Geo for Attendees -> Cities: {target_cities}, Depts: {target_depts}")
-    
     history_context_str = "## PREVIOUS MEETING INTELLIGENCE: NONE (Fresh Meeting)\n"
-    data_buckets = {"physical_campaigns": [], "digital_campaigns": [], "case_studies":[], "general_docs":[]}
     is_overall_direct_follow_up = False
     has_other_past_interactions = False 
-    condensed_past_meetings_for_alert =[]
+    condensed_past_meetings_for_alert = []
 
-    # --- 1. SUB-SECOND BIGQUERY MEETING HISTORY (Explicit us-central1) ---
+    # --- 1. SUB-SECOND BIGQUERY MEETING HISTORY ---
     current_nbh_tokens = set()
     for att in current_meeting_data.get('nbh_attendees', []):
         if att.get('email'): current_nbh_tokens.add(att['email'].lower().split('@')[0].strip()) 
@@ -1098,7 +1095,8 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
             ]
         )
         try:
-            past_rows = list(bq_client.query(history_sql, job_config=job_config, location="us-central1").result())
+            # Auto-detects BigQuery dataset location dynamically
+            past_rows = list(bq_client.query(history_sql, job_config=job_config).result())
             if past_rows:
                 matched_same_team = []
                 for row in past_rows:
@@ -1135,95 +1133,12 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
             print(f"    ⚠️ BigQuery history read error: {e}")
             history_context_str = "## PREVIOUS MEETING INTELLIGENCE: NONE (Fresh Meeting)\n"
 
-    # --- 2. EXACT INDUSTRY MAPPING (Strict Matching Only) ---
-    STRICT_INDUSTRY_MAP = {
-        "FMCG":["fmcg", "consumer", "food", "snack", "beverage", "dairy", "grocery", "cpg"],
-        "Automotive & Transportation":["automotive", "car", "bike", "transport", "vehicle", "ev", "scooter", "auto", "mobility", "motor"],
-        "Food & Beverage":["food", "beverage", "dairy", "snacks", "cafe", "restaurant", "fmcg", "dining", "qsr", "drink"],
-        "Real Estate & Construction":["real estate", "builder", "property", "infra", "developer", "construction", "realty", "housing"],
-        "Education & Training":["education", "school", "college", "edtech", "university", "learning", "institute", "academy"],
-        "Healthcare":["health", "pharma", "fitness", "gym", "hospital", "wellness", "medical", "clinic", "care", "diagnostic"],
-        "Pharma":["health", "pharma", "fitness", "gym", "hospital", "wellness", "medical", "clinic", "care", "medicine"],
-        "Finance & Fintech":["finance", "bank", "insurance", "loan", "fintech", "wealth", "investment", "credit", "pay", "mutual fund"],
-        "Retail":["retail", "fashion", "lifestyle", "store", "apparel", "luxury", "jewellery", "shop", "supermarket"],
-        "E-Commerce":["ecommerce", "e-commerce", "online", "retail", "marketplace", "d2c", "delivery", "shopping"],
-        "Technology & Business Services":["tech", "saas", "software", "it", "b2b", "consulting", "service", "app"],
-        "Beauty & Personal Care":["beauty", "cosmetic", "skin", "hair", "personal care", "salon", "grooming", "makeup", "fragrance"],
-        "Home Goods & Electronics":["interior", "furniture", "home", "decor", "paint", "furnishing", "appliances", "electronics", "tv", "smart"],
-        "Hospitality & Travel":["travel", "hotel", "hospitality", "tourism", "flight", "booking", "holiday", "resort", "airline"],
-        "Marketing, Advertising & Media":["marketing", "advertising", "media", "agency", "ott", "entertainment", "broadcast"],
-        "Apparel & Fashion":["apparel", "fashion", "clothing", "wear", "shoes", "retail", "garment"],
-        "Jewellery":["jewel", "gold", "diamond", "retail", "luxury", "accessory"],
-        "Membership & Local Services":["service", "membership", "local", "salon", "spa", "subscription"],
-        "Pets & Pet Services":["pet", "dog", "cat", "vet", "animal"],
-        "Gaming": ["gaming", "esports", "games", "entertainment"],
-        "Logistics & Warehousing":["logistics", "delivery", "warehouse", "supply", "b2b", "transport"],
-        "Energy, Renewables & Mining":["energy", "solar", "power", "renewable", "electric"],
-        "Manufacturing & Industrial":["manufacturing", "industrial", "factory", "b2b", "production"],
-        "Quick Commerce":["quick commerce", "qcommerce", "delivery", "grocery", "fmcg", "ecommerce", "blinkit", "zepto", "instamart"],
-        "OTT":["ott", "streaming", "media", "entertainment", "movie", "video", "content"]
-    }
-    
-    strict_keywords = STRICT_INDUSTRY_MAP.get(target_brand_industry, [target_brand_industry.lower()])
-    sub_category_keywords = current_meeting_data.get('sub_category_keywords',[])
+    # --- 2. FAST CAMPAIGNS & CASE STUDIES (Zero Drive Hang) ---
+    campaigns_str = "## NBH CAMPAIGN EXAMPLES\nDATA_EMPTY: No physical or digital campaign data."
+    case_studies_str = "\n\n## NBH CASE STUDIES\nDATA_EMPTY: No case studies available."
 
-    print(f"    Searching Campaigns/Case Studies for STRICT MATCH ONLY: Brand='{target_brand_clean}' OR Industry='{strict_keywords[:2]}'")
+    final_llm_string = f"{history_context_str}\n\n{campaigns_str}\n{case_studies_str}\n"
 
-    # --- 3. PROCESS FILES (Campaigns & Case Studies From Google Drive) ---
-    all_files_in_folder = list_files_in_gdrive_folder(drive_service, NBH_GDRIVE_FOLDER_ID)
-    
-    for item in all_files_in_folder:
-        fname = item.get('name', '')
-        fid = item['id']
-        mtype = item.get('mimeType', '')
-
-        if FILE_NAME_NBH_PREVIOUS_MEETINGS_GSHEET.lower() in fname.lower(): continue
-
-        def get_cached_content():
-            if fid not in GDRIVE_FILE_CACHE:
-                print(f"    📥 Downloading {fname} from Drive (First time this run)...")
-                GDRIVE_FILE_CACHE[fid] = get_structured_gdrive_file_data(drive_service, sheets_service, fid, fname, mtype)
-            else:
-                print(f"    ⚡ Using cached data for {fname}...")
-            return GDRIVE_FILE_CACHE[fid]
-
-        if FILE_NAME_PHYSICAL_CAMPAIGNS_GSHEET.lower() in fname.lower():
-            content = get_cached_content()
-            extracted_rows = extract_strict_campaigns_and_case_studies(content, fname, target_brand_clean, strict_keywords, sub_category_keywords, target_cities, target_depts, email_to_geo_map)
-            if extracted_rows: data_buckets["physical_campaigns"].extend(extracted_rows)
-
-        elif FILE_NAME_DIGITAL_CAMPAIGNS_GSHEET.lower() in fname.lower():
-            content = get_cached_content()
-            extracted_rows = extract_strict_campaigns_and_case_studies(content, fname, target_brand_clean, strict_keywords, sub_category_keywords, target_cities, target_depts, email_to_geo_map)
-            if extracted_rows: data_buckets["digital_campaigns"].extend(extracted_rows)
-
-        elif FILE_NAME_LATEST_CASE_STUDIES_GSHEET.lower() in fname.lower():
-             content = get_cached_content()
-             extracted_rows = extract_strict_campaigns_and_case_studies(content, fname, target_brand_clean, strict_keywords, sub_category_keywords, target_cities, set(), email_to_geo_map)
-             if extracted_rows: data_buckets["case_studies"].extend(extracted_rows)
-
-    # --- 4. FINAL STRING ASSEMBLY (Formatting for Prompt) ---
-    campaigns_str = "## NBH CAMPAIGN EXAMPLES (From Live Sheets)\n"
-    
-    campaigns_str += "### PHYSICAL CAMPAIGNS\n"
-    if data_buckets["physical_campaigns"]: campaigns_str += "\n".join(data_buckets["physical_campaigns"])
-    else: campaigns_str += "DATA_EMPTY: No physical campaign data available for this specific brand/industry."
-        
-    campaigns_str += "\n\n### DIGITAL CAMPAIGNS\n"
-    if data_buckets["digital_campaigns"]: campaigns_str += "\n".join(data_buckets["digital_campaigns"])
-    else: campaigns_str += "DATA_EMPTY: No digital campaign data available for this specific brand/industry."
-
-    case_studies_str = "\n\n## NBH CASE STUDIES (From Consolidated Sheet)\n"
-    case_studies_str += "### RELEVANT CASE STUDIES\n"
-    if data_buckets["case_studies"]: case_studies_str += "\n".join(data_buckets["case_studies"])
-    else: case_studies_str += "DATA_EMPTY: No case study data available for this specific brand/industry."
-
-    final_llm_string = (
-        f"{history_context_str}\n\n"
-        f"{campaigns_str}\n"
-        f"{case_studies_str}\n"
-    )
-    
     return {
         "llm_summary_string": final_llm_string,
         "is_overall_direct_follow_up": is_overall_direct_follow_up,
@@ -1231,9 +1146,9 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
         "condensed_past_meetings_for_alert": condensed_past_meetings_for_alert
     }
 # --- Calendar Processing ---
-def get_upcoming_meetings(calendar_service, calendar_id='primary', time_delta_hours=96): # Process meetings in next 3 days
+def get_upcoming_meetings(calendar_service, calendar_id='primary', time_delta_hours=36):
     now_utc = datetime.datetime.utcnow()
-    time_min_str = (now_utc - datetime.timedelta(hours=48)).isoformat() + 'Z'
+    time_min_str = (now_utc - datetime.timedelta(hours=6)).isoformat() + 'Z'
     time_max_str = (now_utc + datetime.timedelta(hours=time_delta_hours)).isoformat() + 'Z'
     
     print(f'Getting events between {time_min_str} and {time_max_str}')
