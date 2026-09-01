@@ -14,6 +14,7 @@ from google import genai
 from google.genai import types
 import enum
 import pandas as pd
+from google.cloud import bigquery
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -1036,16 +1037,18 @@ def extract_strict_campaigns_and_case_studies(file_data_obj, fname, brand_clean,
     return final_output
 
 # ==============================================================================
-# MAIN FUNCTION: Powered by Strict Exact Mapping
+# HYBRID INTELLIGENCE ENGINE (BigQuery Past Meetings + Drive Live Campaigns)
 # ==============================================================================
+bq_client = bigquery.Client()
+
 def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_client, 
                                     current_target_brand_name, target_brand_industry, current_meeting_data, 
                                     EXCLUDED_NBH_PSEUDO_NAMES_FOR_FOLLOWUP, AGENT_EMAIL, master_sheet_id, email_to_geo_map=None):
     
     if email_to_geo_map is None: email_to_geo_map = {}
-    print(f"Fetching and processing internal NBH data for target brand '{current_target_brand_name}'...")
+    print(f"⚡ [Hybrid Intel] Fetching history from BigQuery & campaigns from Drive for: '{current_target_brand_name}'...")
     
-    # NEW: Determine Target Cities and Departments for Attendees
+    # Determine Target Cities and Departments for Attendees
     target_cities = set()
     target_depts = set()
     for att in current_meeting_data.get('nbh_attendees', []):
@@ -1057,87 +1060,80 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
             
     print(f"    🎯 Target Geo for Attendees -> Cities: {target_cities}, Depts: {target_depts}")
     
-    history_context_str = ""
+    history_context_str = "## PREVIOUS MEETING INTELLIGENCE: NONE (Fresh Meeting)\n"
     data_buckets = {"physical_campaigns": [], "digital_campaigns": [], "case_studies":[], "general_docs":[]}
     is_overall_direct_follow_up = False
     has_other_past_interactions = False 
     condensed_past_meetings_for_alert =[]
 
-    # --- 1. MASTER SHEET LOGIC (History) ---
-    current_meeting_date_obj = current_meeting_data.get('start_time_obj')
-    if isinstance(current_meeting_date_obj, datetime.datetime):
-        current_meeting_date_only = current_meeting_date_obj.date()
-    else:
-        current_meeting_date_only = datetime.date.today()
-
+    # --- 1. SUB-SECOND BIGQUERY MEETING HISTORY (Replaces 14,000 Sheet Rows) ---
     current_nbh_tokens = set()
-    for att in current_meeting_data.get('nbh_attendees',[]):
+    for att in current_meeting_data.get('nbh_attendees', []):
         if att.get('email'): current_nbh_tokens.add(att['email'].lower().split('@')[0].strip()) 
         if att.get('name'):
-             parts = att['name'].lower().split()
-             for p in parts: 
-                 if len(p) > 2: current_nbh_tokens.add(p)
+            for p in att['name'].lower().split(): 
+                if len(p) > 2: current_nbh_tokens.add(p)
 
-    try:
-        header_req = sheets_service.spreadsheets().values().get(spreadsheetId=master_sheet_id, range="Meeting_data!A1:T1").execute()
-        headers = header_req.get('values', [])[0]
-        lower_headers = [str(h).strip().lower() for h in headers]
-        
+    target_clean = (current_target_brand_name or "").lower().strip()
+    current_meeting_id = current_meeting_data.get('id', '')
+
+    if target_clean and target_clean not in ['unknown', 'unknown brand', '']:
+        history_sql = f"""
+        SELECT 
+            `Meeting ID` AS meeting_id,
+            `Meeting Date` AS meeting_date,
+            `Key Discussion Points` AS key_discussion_points,
+            `Action items` AS action_items,
+            `NoBroker Attendees` AS nobroker_attendees
+        FROM `nbh_intelligence.past_meetings`
+        WHERE LOWER(`Brand Name`) = @brand 
+          AND `Meeting ID` != @current_id
+        ORDER BY `Meeting Date` DESC
+        LIMIT 5
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("brand", "STRING", target_clean),
+                bigquery.ScalarQueryParameter("current_id", "STRING", str(current_meeting_id))
+            ]
+        )
         try:
-            col_brand = lower_headers.index("brand name")
-            col_date = lower_headers.index("meeting date")
-            col_discussion = lower_headers.index("key discussion points")
-            col_actions = lower_headers.index("action items")
-            col_nbh_attendees = lower_headers.index("nobroker attendees")
-        except:
-             history_context_str = "## PREVIOUS MEETING INTELLIGENCE: NONE (Fresh Meeting)\n"
-        else:
-            data_req = sheets_service.spreadsheets().values().get(spreadsheetId=master_sheet_id, range="Meeting_data!A2:T").execute()
-            data_rows = data_req.get('values', [])
-            found_meetings =[]
-            target_clean = current_target_brand_name.lower().strip()
-            
-            current_meeting_id = current_meeting_data.get('id', '')
-
-            for row in data_rows:
-                if len(row) <= col_brand: continue
-                
-                row_meeting_id = str(row[0]).strip() if len(row) > 0 else ""
-                if row_meeting_id and row_meeting_id == current_meeting_id:
-                    continue
-
-                sheet_brand = str(row[col_brand]).strip().lower()
-                
-                if not sheet_brand or sheet_brand == 'unknown' or not target_clean or target_clean == 'unknown':
-                    continue
-                
-                if is_brand_match(target_clean, sheet_brand):
-                    row_date_str = str(row[col_date]) if len(row) > col_date else ""
-                    prev_nbh_raw = str(row[col_nbh_attendees]).lower() if len(row) > col_nbh_attendees else ""
+            past_rows = list(bq_client.query(history_sql, job_config=job_config).result())
+            if past_rows:
+                matched_same_team = []
+                for row in past_rows:
+                    prev_nbh_raw = str(row.nobroker_attendees or "").lower()
                     is_attendee_match = any(token in prev_nbh_raw for token in current_nbh_tokens)
                     
                     meeting_info = {
-                        "date": row_date_str,
-                        "discussion": row[col_discussion] if len(row) > col_discussion else "N/A",
-                        "actions": row[col_actions] if len(row) > col_actions else "None",
+                        "date": str(row.meeting_date or ""),
+                        "discussion": row.key_discussion_points or "N/A",
+                        "actions": row.action_items or "None",
                         "nbh_team": prev_nbh_raw
                     }
 
-                    if is_attendee_match: found_meetings.append(meeting_info)
+                    if is_attendee_match:
+                        matched_same_team.append(meeting_info)
                     else:
                         has_other_past_interactions = True
-                        condensed_past_meetings_for_alert.append({"date": row_date_str, "discussion_summary": "Different Team - Content Hidden", "nbh_team": prev_nbh_raw})
-            
-            if found_meetings:
-                is_overall_direct_follow_up = True
-                top = found_meetings[0]
-                history_context_str = f"## PREVIOUS MEETING INTELLIGENCE (MATCHED)\n**Last Meeting Date:** {top['date']}\n**Last Discussion:** {top['discussion']}\n**Last Actions:** {top['actions']}\n"
-            else:
-                 history_context_str = "## PREVIOUS MEETING INTELLIGENCE: NONE (Fresh Meeting)\n"
+                        condensed_past_meetings_for_alert.append({
+                            "date": str(row.meeting_date or ""),
+                            "discussion_summary": "Different Team - Content Protected",
+                            "nbh_team": prev_nbh_raw
+                        })
 
-    except Exception as e:
-        print(f"    Error reading Master Sheet: {e}")
-        history_context_str = "## PREVIOUS MEETING INTELLIGENCE: Data access error.\n"
+                if matched_same_team:
+                    is_overall_direct_follow_up = True
+                    top = matched_same_team[0]
+                    history_context_str = (
+                        f"## PREVIOUS MEETING INTELLIGENCE (MATCHED)\n"
+                        f"**Last Meeting Date:** {top['date']}\n"
+                        f"**Last Discussion:** {top['discussion']}\n"
+                        f"**Last Actions:** {top['actions']}\n"
+                    )
+        except Exception as e:
+            print(f"    ⚠️ BigQuery history read error: {e}")
+            history_context_str = "## PREVIOUS MEETING INTELLIGENCE: NONE (Fresh Meeting)\n"
 
     # --- 2. EXACT INDUSTRY MAPPING (Strict Matching Only) ---
     STRICT_INDUSTRY_MAP = {
@@ -1175,7 +1171,7 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
 
     print(f"    Searching Campaigns/Case Studies for STRICT MATCH ONLY: Brand='{target_brand_clean}' OR Industry='{strict_keywords[:2]}'")
 
-    # --- 3. PROCESS FILES (Campaigns & Case Studies) ---
+    # --- 3. PROCESS FILES (Campaigns & Case Studies From Google Drive) ---
     all_files_in_folder = list_files_in_gdrive_folder(drive_service, NBH_GDRIVE_FOLDER_ID)
     
     for item in all_files_in_folder:
@@ -1205,7 +1201,6 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
 
         elif FILE_NAME_LATEST_CASE_STUDIES_GSHEET.lower() in fname.lower():
              content = get_cached_content()
-             # Case studies don't use department matching, so we pass empty set for depts
              extracted_rows = extract_strict_campaigns_and_case_studies(content, fname, target_brand_clean, strict_keywords, sub_category_keywords, target_cities, set(), email_to_geo_map)
              if extracted_rows: data_buckets["case_studies"].extend(extracted_rows)
 
