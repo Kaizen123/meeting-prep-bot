@@ -1037,9 +1037,10 @@ def extract_strict_campaigns_and_case_studies(file_data_obj, fname, brand_clean,
     return final_output
 
 # ==============================================================================
-# SUB-SECOND BIGQUERY INTELLIGENCE ENGINE (Auto-Detect Location)
+# SUB-SECOND BIGQUERY INTELLIGENCE ENGINE (Explicit Project & us-central1 Location)
 # ==============================================================================
-bq_client = bigquery.Client()
+BQ_PROJECT_ID = "nbh-meeting-bot-live-493506"
+bq_client = bigquery.Client(project=BQ_PROJECT_ID, location="us-central1")
 
 def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_client, 
                                     current_target_brand_name, target_brand_industry, current_meeting_data, 
@@ -1063,7 +1064,7 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
     has_other_past_interactions = False 
     condensed_past_meetings_for_alert = []
 
-    # --- 1. SUB-SECOND BIGQUERY MEETING HISTORY ---
+    # --- 1. SUB-SECOND BIGQUERY MEETING HISTORY (Explicit us-central1) ---
     current_nbh_tokens = set()
     for att in current_meeting_data.get('nbh_attendees', []):
         if att.get('email'): current_nbh_tokens.add(att['email'].lower().split('@')[0].strip()) 
@@ -1075,14 +1076,14 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
     current_meeting_id = current_meeting_data.get('id', '')
 
     if target_clean and target_clean not in ['unknown', 'unknown brand', '']:
-        history_sql = """
+        history_sql = f"""
         SELECT 
             `Meeting ID` AS meeting_id,
             `Meeting Date` AS meeting_date,
             `Key Discussion Points` AS key_discussion_points,
             `Action items` AS action_items,
             `NoBroker Attendees` AS nobroker_attendees
-        FROM `nbh_intelligence.past_meetings`
+        FROM `{BQ_PROJECT_ID}.nbh_intelligence.past_meetings`
         WHERE LOWER(`Brand Name`) = @brand 
           AND `Meeting ID` != @current_id
         ORDER BY `Meeting Date` DESC
@@ -1095,8 +1096,7 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
             ]
         )
         try:
-            # Auto-detects BigQuery dataset location dynamically
-            past_rows = list(bq_client.query(history_sql, job_config=job_config).result())
+            past_rows = list(bq_client.query(history_sql, job_config=job_config, location="us-central1").result())
             if past_rows:
                 matched_same_team = []
                 for row in past_rows:
@@ -2495,7 +2495,7 @@ def main():
 
     processed_ids_local_file = load_processed_event_ids()
 
-    MAX_BRIEFS_PER_RUN = 3
+    MAX_BRIEFS_PER_RUN = 2
     briefs_generated_this_run = 0
 
     for event_payload in upcoming_events:
