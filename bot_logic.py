@@ -1046,9 +1046,20 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
                                     current_target_brand_name, target_brand_industry, current_meeting_data, 
                                     EXCLUDED_NBH_PSEUDO_NAMES_FOR_FOLLOWUP, AGENT_EMAIL, master_sheet_id, email_to_geo_map=None):
     
+    global GDRIVE_FILE_CACHE
     if email_to_geo_map is None: email_to_geo_map = {}
     print(f"⚡ [BigQuery Intel] Fetching deep meeting history for: '{current_target_brand_name}'...")
     
+    # Extract Target Cities and Departments for Attendees
+    target_cities = set()
+    target_depts = set()
+    for att in current_meeting_data.get('nbh_attendees', []):
+        att_email = att.get('email', '').lower()
+        if att_email in email_to_geo_map:
+            geo_info = email_to_geo_map[att_email]
+            if geo_info.get('city'): target_cities.add(geo_info['city'].lower())
+            if geo_info.get('dept'): target_depts.add(geo_info['dept'].lower())
+
     history_context_str = "## PREVIOUS MEETING INTELLIGENCE: NONE (Fresh Meeting)\n"
     is_overall_direct_follow_up = False
     has_other_past_interactions = False 
@@ -1080,7 +1091,7 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
 
     current_meeting_id = current_meeting_data.get('id', '')
 
-    # --- 4. Sub-Second BigQuery Multi-Layer Scan (All 19 Columns, Excluding Closure Score) ---
+    # --- 4. Sub-Second BigQuery Multi-Layer Scan ---
     if target_clean and target_clean not in ['unknown', 'unknown brand', '']:
         domain_sql_conditions = ""
         if client_domains:
@@ -1191,9 +1202,62 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
             print(f"    ⚠️ BigQuery history read error: {e}")
             history_context_str = "## PREVIOUS MEETING INTELLIGENCE: NONE (Fresh Meeting)\n"
 
-    # Fast campaigns / case studies summary
-    campaigns_str = "## NBH CAMPAIGN EXAMPLES\nDATA_EMPTY: No physical or digital campaign data."
-    case_studies_str = "\n\n## NBH CASE STUDIES\nDATA_EMPTY: No case studies available."
+    # --- 5. LIVE CAMPAIGNS & CASE STUDIES (Cached & Scanned from Drive) ---
+    campaign_entries = []
+    case_study_entries = []
+    
+    strict_keywords = [target_brand_industry.lower()] if target_brand_industry and target_brand_industry != 'Unknown' else []
+    sub_category_keywords = current_meeting_data.get('sub_category_keywords', [])
+
+    try:
+        # Load sheets once into cache if not loaded
+        if not GDRIVE_FILE_CACHE and drive_service and NBH_GDRIVE_FOLDER_ID:
+            print("  📂 Loading Campaign & Case Study sheets from Google Drive into cache...")
+            gdrive_files = list_files_in_gdrive_folder(drive_service, NBH_GDRIVE_FOLDER_ID)
+            for f in gdrive_files:
+                fname = f.get('name', '')
+                fid = f.get('id', '')
+                fmime = f.get('mimeType', '')
+                if any(x in fname for x in [FILE_NAME_PHYSICAL_CAMPAIGNS_GSHEET, FILE_NAME_DIGITAL_CAMPAIGNS_GSHEET, FILE_NAME_LATEST_CASE_STUDIES_GSHEET]):
+                    print(f"    Loading sheet: '{fname}'")
+                    GDRIVE_FILE_CACHE[fname] = get_structured_gdrive_file_data(drive_service, sheets_service, fid, fname, fmime)
+
+        # Scan Physical & Digital Campaigns
+        for fname, file_data_obj in GDRIVE_FILE_CACHE.items():
+            if FILE_NAME_PHYSICAL_CAMPAIGNS_GSHEET in fname or FILE_NAME_DIGITAL_CAMPAIGNS_GSHEET in fname:
+                matches = extract_strict_campaigns_and_case_studies(
+                    file_data_obj=file_data_obj,
+                    fname=fname,
+                    brand_clean=target_clean,
+                    strict_keywords=strict_keywords,
+                    sub_category_keywords=sub_category_keywords,
+                    target_cities=target_cities,
+                    target_depts=target_depts,
+                    email_to_geo_map=email_to_geo_map
+                )
+                if matches:
+                    campaign_entries.extend(matches)
+
+            # Scan Consolidated Case Studies
+            elif FILE_NAME_LATEST_CASE_STUDIES_GSHEET in fname:
+                matches = extract_strict_campaigns_and_case_studies(
+                    file_data_obj=file_data_obj,
+                    fname=fname,
+                    brand_clean=target_clean,
+                    strict_keywords=strict_keywords,
+                    sub_category_keywords=sub_category_keywords,
+                    target_cities=target_cities,
+                    target_depts=target_depts,
+                    email_to_geo_map=email_to_geo_map
+                )
+                if matches:
+                    case_study_entries.extend(matches)
+
+    except Exception as e:
+        print(f"    ⚠️ Error scanning live campaign/case study sheets: {e}")
+
+    campaigns_str = "## NBH CAMPAIGN EXAMPLES\n" + ("\n".join(campaign_entries) if campaign_entries else "DATA_EMPTY: No physical or digital campaign data.")
+    case_studies_str = "\n\n## NBH CASE STUDIES\n" + ("\n".join(case_study_entries) if case_study_entries else "DATA_EMPTY: No case studies available.")
 
     final_llm_string = f"{history_context_str}\n\n{campaigns_str}\n{case_studies_str}\n"
 
