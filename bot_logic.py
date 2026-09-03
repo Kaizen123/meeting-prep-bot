@@ -323,18 +323,33 @@ def is_brand_match(brand1, brand2):
 def search_attendee_intel(email, raw_name, company_name, gemini_llm_client):
     """
     Profiles attendees using Serper.dev across all production meetings.
-    Handles personal profiles vs activity posts dynamically.
+    Handles personal profiles vs activity posts dynamically with fallback safety.
     """
-    if not gemini_llm_client:
-        return None
-    
     email_prefix = email.split('@')[0] if '@' in email else email
     domain = email.split('@')[1] if '@' in email else ""
 
-    search_query = f"{raw_name or email_prefix} {company_name or domain} India LinkedIn"
+    default_result = {
+        "inferred_name": (raw_name or email_prefix).title(),
+        "linkedin_url": None,
+        "recent_post_url": None,
+        "post_context": None
+    }
+
+    if not gemini_llm_client or not SERPER_API_KEY:
+        return default_result
+
+    # Construct targeted search query prioritizing person profile over generic pages
+    clean_name = raw_name if raw_name and raw_name.lower() != email_prefix.lower() else email_prefix.replace('.', ' ')
+    search_query = f'site:linkedin.com/in "{company_name}" {clean_name}'
+    
     print(f"    🔍 [Attendee Search] Querying Serper: '{search_query}'")
     search_context = execute_serper_search_api(search_query, num_results=4)
     
+    # Fallback to broad query if targeted site search yields nothing
+    if "No search results" in search_context or "Search failed" in search_context:
+        search_query_broad = f"{clean_name} {company_name} India LinkedIn"
+        search_context = execute_serper_search_api(search_query_broad, num_results=4)
+
     prompt = f"""
     You are an expert OSINT researcher profiling a meeting attendee.
     Email: '{email}' | Company Name: '{company_name}' in India.
@@ -350,9 +365,9 @@ def search_attendee_intel(email, raw_name, company_name, gemini_llm_client):
     Task 3: Extract any recent post/activity link from the search results (usually contains 'linkedin.com/posts/').
 
     RULES:
-    1. Only return URLs present in the search data. Do not make up links.
-    2. Do not return company pages, only personal profiles or their direct post URLs.
-    3. If no matching LinkedIn profile is found, return null.
+    1. Only return URLs explicitly present in the search data. Do not make up links.
+    2. Do NOT return company pages (e.g., 'linkedin.com/company/'). Only personal profiles ('linkedin.com/in/').
+    3. If no personal LinkedIn profile URL is found in the search results, return null for linkedin_url.
 
     Return ONLY a JSON object:
     {{
@@ -365,28 +380,66 @@ def search_attendee_intel(email, raw_name, company_name, gemini_llm_client):
     config = types.GenerateContentConfig(temperature=0.0, response_mime_type="application/json")
     try:
         response = gemini_llm_client.models.generate_content(model="gemini-2.5-flash", contents=prompt, config=config)
-        data = json.loads(response.text.strip())
+        raw_resp = response.text.strip()
+        cleaned_json = re.sub(r'```json\s*|\s*```', '', raw_resp).strip()
+        data = json.loads(cleaned_json)
+        
+        # Verify that the URL actually looks like a personal LinkedIn profile
+        url = data.get("linkedin_url")
+        if url and ("linkedin.com/in/" not in url or "null" in url.lower()):
+            data["linkedin_url"] = None
+
         return data
     except Exception as e:
-        print(f"  Error parsing Serper response for {email}: {e}")
-        return {"inferred_name": raw_name.title() or email_prefix.title(), "linkedin_url": None, "recent_post_url": None, "post_context": None}
+        print(f"  ⚠️ Error parsing Serper attendee response for {email}: {e}")
+        return default_result
 
 
 # ========== UPGRADED FUNCTION 2: Get LinkedIn & Posts for All Attendees ==========
 def get_brand_attendees_linkedin_info(brand_attendees_list, brand_name, gemini_llm_client):
     """
-    Instantly returns basic attendee information, bypassing slow external web queries
-    to preserve real-time execution speed.
+    Profiles brand attendees using Serper.dev and Gemini to extract active
+    LinkedIn URLs while maintaining safe fallbacks if search finds no matches.
     """
     attendees_with_intel = []
+    
+    if not brand_attendees_list:
+        return attendees_with_intel
+
     for attendee in brand_attendees_list:
-        attendees_with_intel.append({
-            'name': attendee.get('name', '').title(),
-            'email': attendee.get('email', ''),
-            'linkedin_url': '(LinkedIn Not Verified)',
-            'recent_post_url': None,
-            'post_context': None
-        })
+        raw_name = attendee.get('name', '').strip()
+        email = attendee.get('email', '').strip()
+        email_prefix = email.split('@')[0] if '@' in email else email
+
+        try:
+            intel = search_attendee_intel(
+                email=email,
+                raw_name=raw_name,
+                company_name=brand_name,
+                gemini_llm_client=gemini_llm_client
+            )
+        except Exception as e:
+            print(f"  ⚠️ Search attendee error for {email}: {e}")
+            intel = None
+
+        if intel and intel.get('linkedin_url'):
+            attendees_with_intel.append({
+                'name': intel.get('inferred_name') or raw_name.title() or email_prefix.title(),
+                'email': email,
+                'linkedin_url': intel.get('linkedin_url'),
+                'recent_post_url': intel.get('recent_post_url'),
+                'post_context': intel.get('post_context')
+            })
+            print(f"    ✅ Verified LinkedIn for {attendee.get('name')}: {intel.get('linkedin_url')}")
+        else:
+            attendees_with_intel.append({
+                'name': raw_name.title() or email_prefix.title(),
+                'email': email,
+                'linkedin_url': '(LinkedIn Not Verified)',
+                'recent_post_url': None,
+                'post_context': None
+            })
+
     return attendees_with_intel
 
 def find_potential_key_contacts(brand_name, gemini_llm_client):
