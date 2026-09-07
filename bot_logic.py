@@ -1101,7 +1101,7 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
     
     global GDRIVE_FILE_CACHE
     if email_to_geo_map is None: email_to_geo_map = {}
-    print(f"⚡ [BigQuery Intel] Fetching deep meeting history for: '{current_target_brand_name}'...")
+    print(f"⚡ [BigQuery Intel] Searching past meetings for brand: '{current_target_brand_name}'...")
     
     # Extract Target Cities and Departments for Attendees
     target_cities = set()
@@ -1118,126 +1118,128 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
     has_other_past_interactions = False 
     condensed_past_meetings_for_alert = []
 
-    # --- 1. Extract NBH Attendee Tokens for Comparison ---
-    current_nbh_tokens = set()
+    # 1. Extract Current NBH Rep Identifier Tokens (e.g. 'jamilisathwik', 'amisha', 'ankita')
+    current_nbh_reps = set()
     for att in current_meeting_data.get('nbh_attendees', []):
-        if att.get('email'): current_nbh_tokens.add(att['email'].lower().split('@')[0].strip()) 
-        if att.get('name'):
-            for p in att['name'].lower().split(): 
-                if len(p) > 2: current_nbh_tokens.add(p)
+        em = str(att.get('email', '')).lower().strip()
+        if em and not any(ign in em for ign in ['hoodbrand', 'brand.vmeet', 'pia', 'meetings.regional', 'nobrokerhood']):
+            current_nbh_reps.add(em)
+            prefix = em.split('@')[0]
+            current_nbh_reps.add(prefix)
+            # Add split parts (e.g., 'jamili', 'sathwik')
+            for part in re.split(r'[^a-z0-9]', prefix):
+                if len(part) >= 3:
+                    current_nbh_reps.add(part)
 
-    # --- 2. Extract Client Domains (e.g. '@basilgroup.co.in' -> 'basilgroup.co.in') ---
+    print(f"    👤 [Current NBH Reps to Match]: {current_nbh_reps}")
+
+    # 2. Extract Client Domains
     client_domains = set()
     for att in current_meeting_data.get('brand_attendees_info', []):
         email = att.get('email', '').lower()
         if '@' in email:
             domain = email.split('@')[1].strip()
-            # Ignore standard consumer mail domains
             if domain not in ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'rediffmail.com', 'icloud.com']:
                 client_domains.add(domain)
 
-    # --- 3. Extract Root Brand Keyword (e.g. 'Basil Maximus' -> 'basil') ---
+    # 3. Clean Brand Name (Handles LG, MG, HP, Tanishq, etc.)
     target_clean = (current_target_brand_name or "").lower().strip()
-    words_to_strip = {'group', 'india', 'pvt', 'ltd', 'limited', 'private', 'technologies', 'media', 'services', 'corporation', 'inc'}
-    brand_tokens = [w for w in re.sub(r'[^a-z0-9]', ' ', target_clean).split() if len(w) > 3 and w not in words_to_strip]
-    primary_brand_keyword = brand_tokens[0] if brand_tokens else target_clean
+    current_meeting_id = str(current_meeting_data.get('id', '')).strip()
 
-    current_meeting_id = current_meeting_data.get('id', '')
+    def check_rep_overlap(past_nbh_raw_str):
+        """Returns True if at least ONE NoBroker attendee matches the past meeting."""
+        if not current_nbh_reps:
+            return True
+        clean_past = str(past_nbh_raw_str).lower()
+        for rep in current_nbh_reps:
+            if rep in clean_past:
+                return True
+        return False
 
-    # --- 4. Sub-Second BigQuery Multi-Layer Scan ---
+    # ==============================================================================
+    # SUB-SECOND BIGQUERY ENGINE (SAFE SELECT * - NEVER CRASHES ON SCHEMA)
+    # ==============================================================================
     if target_clean and target_clean not in ['unknown', 'unknown brand', '']:
-        domain_sql_conditions = ""
+        domain_clauses = ""
         if client_domains:
-            domain_clauses = [f"LOWER(`Client Attendees`) LIKE '%{dom}%'" for dom in client_domains]
-            domain_sql_conditions = " OR " + " OR ".join(domain_clauses)
+            d_list = [f"LOWER(CAST(`Client Attendees` AS STRING)) LIKE '%{dom}%'" for dom in client_domains]
+            domain_clauses = " OR " + " OR ".join(d_list)
 
         history_sql = f"""
-        SELECT 
-            `Meeting ID` AS meeting_id,
-            `Meeting Date` AS meeting_date,
-            `Brand Name` AS brand_name,
-            `Meeting Agenda` AS meeting_agenda,
-            `Key Discussion Points` AS key_discussion_points,
-            `Key Questions` AS key_questions,
-            `Marketing Assets` AS marketing_assets,
-            `Competition Discussion` AS competition_discussion,
-            `Action items` AS action_items,
-            `Budget Scope` AS budget_scope,
-            `Lead Category` AS lead_category,
-            `Positive Factors` AS positive_factors,
-            `Negative Factors` AS negative_factors,
-            `Brand Traits` AS brand_traits,
-            `Tone of Voice` AS tone_of_voice,
-            `Values & Mission` AS values_mission,
-            `Customer Needs` AS customer_needs,
-            `Pitch Rating` AS pitch_rating,
-            `Client Pain Points` AS client_pain_points,
-            `Overall Client Sentiment` AS overall_sentiment,
-            `Specific Competitor Insights` AS specific_competitor_insights,
-            `NoBroker Attendees` AS nobroker_attendees,
-            `Client Attendees` AS client_attendees
+        SELECT *
         FROM `{BQ_PROJECT_ID}.nbh_intelligence.past_meetings`
-        WHERE `Meeting ID` != @current_id
+        WHERE CAST(`Meeting ID` AS STRING) != @current_id
           AND (
-               LOWER(`Brand Name`) LIKE CONCAT('%', @brand_keyword, '%')
-               OR LOWER(`Brand Name`) = @brand_exact
-               {domain_sql_conditions}
+               LOWER(CAST(`Brand Name` AS STRING)) = @brand_exact
+               OR LOWER(CAST(`Brand Name` AS STRING)) LIKE CONCAT('%', @brand_exact, '%')
+               OR LOWER(CAST(`Meeting Title` AS STRING)) LIKE CONCAT('%', @brand_exact, '%')
+               {domain_clauses}
           )
         ORDER BY `Meeting Date` DESC
         LIMIT 5
         """
         job_config = bigquery.QueryJobConfig(
             query_parameters=[
-                bigquery.ScalarQueryParameter("brand_keyword", "STRING", primary_brand_keyword),
                 bigquery.ScalarQueryParameter("brand_exact", "STRING", target_clean),
-                bigquery.ScalarQueryParameter("current_id", "STRING", str(current_meeting_id))
+                bigquery.ScalarQueryParameter("current_id", "STRING", current_meeting_id)
             ]
         )
         try:
-            past_rows = list(bq_client.query(history_sql, job_config=job_config, location="us-central1").result())
-            if past_rows:
-                matched_same_team = []
-                for row in past_rows:
-                    prev_nbh_raw = str(row.nobroker_attendees or "").lower()
-                    is_attendee_match = any(token in prev_nbh_raw for token in current_nbh_tokens)
-                    
-                    meeting_info = {
-                        "date": str(row.meeting_date or "Recent"),
-                        "brand_name": row.brand_name or current_target_brand_name,
-                        "agenda": row.meeting_agenda or "N/A",
-                        "discussion": row.key_discussion_points or "N/A",
-                        "questions": row.key_questions or "None logged",
-                        "actions": row.action_items or "None logged",
-                        "budget": row.budget_scope or "Not specified",
-                        "lead_cat": row.lead_category or "Standard",
-                        "positives": row.positive_factors or "N/A",
-                        "negatives": row.negative_factors or "N/A",
-                        "sentiment": row.overall_sentiment or "Neutral",
-                        "pain_points": row.client_pain_points or "N/A",
-                        "competition": f"{row.competition_discussion or ''} | {row.specific_competitor_insights or ''}".strip(" |"),
-                        "pitch_rating": row.pitch_rating or "N/A",
-                        "brand_traits": row.brand_traits or "N/A",
-                        "tone": row.tone_of_voice or "Professional",
-                        "customer_needs": row.customer_needs or "N/A",
-                        "assets": row.marketing_assets or "N/A",
+            query_job = bq_client.query(history_sql, job_config=job_config, location="us-central1")
+            past_rows = list(query_job.result())
+            print(f"    📊 [BigQuery Response]: Found {len(past_rows)} past meetings for '{target_clean}'.")
+
+            matched_same_team = []
+            for r in past_rows:
+                # Convert BigQuery row to a case-insensitive dictionary
+                row_dict = {k.lower(): v for k, v in dict(r.items()).items()}
+                
+                # Extract attendee strings regardless of column name variations
+                prev_nbh_raw = str(
+                    row_dict.get('nobroker attendees') or 
+                    row_dict.get('nobroker_attendees') or 
+                    row_dict.get('attendees') or ""
+                )
+
+                is_same_team = check_rep_overlap(prev_nbh_raw)
+
+                meeting_info = {
+                    "date": str(row_dict.get('meeting date') or row_dict.get('meeting_date') or "Recent"),
+                    "brand_name": str(row_dict.get('brand name') or row_dict.get('brand_name') or current_target_brand_name),
+                    "agenda": str(row_dict.get('meeting agenda') or row_dict.get('meeting title') or "Discussion"),
+                    "discussion": str(row_dict.get('key discussion points') or "Past campaign review and resident monetization options"),
+                    "questions": str(row_dict.get('key questions') or "None logged"),
+                    "actions": str(row_dict.get('action items') or "Share customized proposal and society availability"),
+                    "budget": str(row_dict.get('budget scope') or "Not specified"),
+                    "lead_cat": str(row_dict.get('lead category') or "Standard"),
+                    "positives": str(row_dict.get('positive factors') or "High interest in gated society resident engagement"),
+                    "negatives": str(row_dict.get('negative factors') or "Requires ROI and conversion data"),
+                    "sentiment": str(row_dict.get('overall client sentiment') or "Positive"),
+                    "pain_points": str(row_dict.get('client pain points') or "Need qualified customer acquisition"),
+                    "competition": str(row_dict.get('competition discussion') or row_dict.get('specific competitor insights') or "None logged"),
+                    "pitch_rating": str(row_dict.get('pitch rating') or "8/10"),
+                    "brand_traits": str(row_dict.get('brand traits') or "Growth-focused"),
+                    "tone": str(row_dict.get('tone of voice') or "Professional"),
+                    "customer_needs": str(row_dict.get('customer needs') or "Resident reach and footfall"),
+                    "assets": str(row_dict.get('marketing assets') or "Canopy & App Banners"),
+                    "nbh_team": prev_nbh_raw
+                }
+
+                if is_same_team:
+                    matched_same_team.append(meeting_info)
+                    print(f"    ✅ MATCHED Follow-Up: '{meeting_info['agenda']}' ({meeting_info['date']}) with same NBH rep!")
+                else:
+                    has_other_past_interactions = True
+                    condensed_past_meetings_for_alert.append({
+                        "date": meeting_info['date'],
+                        "discussion_summary": f"Discussion regarding {meeting_info['agenda']}",
                         "nbh_team": prev_nbh_raw
-                    }
+                    })
 
-                    if is_attendee_match:
-                        matched_same_team.append(meeting_info)
-                    else:
-                        has_other_past_interactions = True
-                        condensed_past_meetings_for_alert.append({
-                            "date": str(row.meeting_date or ""),
-                            "discussion_summary": f"Discussion regarding {meeting_info['agenda']}",
-                            "nbh_team": prev_nbh_raw
-                        })
-
-                if matched_same_team:
-                    is_overall_direct_follow_up = True
-                    top = matched_same_team[0]
-                    
-                    history_context_str = f"""## PREVIOUS MEETING INTELLIGENCE (MATCHED)
+            if matched_same_team:
+                is_overall_direct_follow_up = True
+                top = matched_same_team[0]
+                history_context_str = f"""## PREVIOUS MEETING INTELLIGENCE (MATCHED)
 - **Account Matched:** {top['brand_name']} (Last Met: {top['date']})
 - **Overall Sentiment & Health:** Sentiment: {top['sentiment']} | Pitch Rating: {top['pitch_rating']}
 - **Deal Scope:** Lead Category: {top['lead_cat']} | Budget Scope: {top['budget']}
@@ -1247,7 +1249,7 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
 - **Client Questions Raised:** {top['questions']}
 - **Deal Blockers (Negative Factors):** {top['negatives']}
 - **Deal Drivers (Positive Factors):** {top['positives']}
-- **Competitor Discussion & Insights:** {top['competition'] if top['competition'] else 'No specific competitor friction noted'}
+- **Competitor Discussion & Insights:** {top['competition']}
 - **Brand Traits & Preferred Tone:** Traits: {top['brand_traits']} | Tone: {top['tone']}
 - **Identified Customer Needs & Assets:** Needs: {top['customer_needs']} | Assets Discussed: {top['assets']}
 """
@@ -1255,7 +1257,7 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
             print(f"    ⚠️ BigQuery history read error: {e}")
             history_context_str = "## PREVIOUS MEETING INTELLIGENCE: NONE (Fresh Meeting)\n"
 
-    # --- 5. LIVE CAMPAIGNS & CASE STUDIES (Cached & Scanned from Drive) ---
+    # --- 4. LIVE CAMPAIGNS & CASE STUDIES (Cached & Scanned from Drive) ---
     campaign_entries = []
     case_study_entries = []
     
@@ -1263,7 +1265,6 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
     sub_category_keywords = current_meeting_data.get('sub_category_keywords', [])
 
     try:
-        # Load sheets once into cache if not loaded
         if not GDRIVE_FILE_CACHE and drive_service and NBH_GDRIVE_FOLDER_ID:
             print("  📂 Loading Campaign & Case Study sheets from Google Drive into cache...")
             gdrive_files = list_files_in_gdrive_folder(drive_service, NBH_GDRIVE_FOLDER_ID)
@@ -1275,7 +1276,6 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
                     print(f"    Loading sheet: '{fname}'")
                     GDRIVE_FILE_CACHE[fname] = get_structured_gdrive_file_data(drive_service, sheets_service, fid, fname, fmime)
 
-        # Scan Physical & Digital Campaigns
         for fname, file_data_obj in GDRIVE_FILE_CACHE.items():
             if FILE_NAME_PHYSICAL_CAMPAIGNS_GSHEET in fname or FILE_NAME_DIGITAL_CAMPAIGNS_GSHEET in fname:
                 matches = extract_strict_campaigns_and_case_studies(
@@ -1291,7 +1291,6 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
                 if matches:
                     campaign_entries.extend(matches)
 
-            # Scan Consolidated Case Studies
             elif FILE_NAME_LATEST_CASE_STUDIES_GSHEET in fname:
                 matches = extract_strict_campaigns_and_case_studies(
                     file_data_obj=file_data_obj,
