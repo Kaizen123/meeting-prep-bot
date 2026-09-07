@@ -1090,9 +1090,9 @@ def extract_strict_campaigns_and_case_studies(file_data_obj, fname, brand_clean,
     return final_output
 
 # ==============================================================================
-# SUB-SECOND BIGQUERY INTELLIGENCE ENGINE (Explicit Project & us-central1 Location)
+# SUB-SECOND BIGQUERY INTELLIGENCE ENGINE (Fixed Schema & Normalized Keys)
 # ==============================================================================
-BQ_PROJECT_ID = "nbh-meeting-bot-live-493506"
+BQ_PROJECT_ID = "nbh-meeting-bot-live"
 bq_client = bigquery.Client(project=BQ_PROJECT_ID, location="us-central1")
 
 def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_client, 
@@ -1142,7 +1142,7 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
             if domain not in ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'rediffmail.com', 'icloud.com']:
                 client_domains.add(domain)
 
-    # 3. Clean Brand Name (Handles LG, MG, HP, Tanishq, etc.)
+    # 3. Clean Brand Name (Handles LG, MG, HP, Tanishq, Bluestone, etc.)
     target_clean = (current_target_brand_name or "").lower().strip()
     current_meeting_id = str(current_meeting_data.get('id', '')).strip()
 
@@ -1157,25 +1157,25 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
         return False
 
     # ==============================================================================
-    # SUB-SECOND BIGQUERY ENGINE (SAFE SELECT * - NEVER CRASHES ON SCHEMA)
+    # SUB-SECOND BIGQUERY ENGINE (UPDATED WITH UNDERSCORES FOR LIVE EXTERNAL TABLE)
     # ==============================================================================
     if target_clean and target_clean not in ['unknown', 'unknown brand', '']:
         domain_clauses = ""
         if client_domains:
-            d_list = [f"LOWER(CAST(`Client Attendees` AS STRING)) LIKE '%{dom}%'" for dom in client_domains]
+            d_list = [f"LOWER(CAST(Client_Attendees AS STRING)) LIKE '%{dom}%'" for dom in client_domains]
             domain_clauses = " OR " + " OR ".join(d_list)
 
         history_sql = f"""
         SELECT *
         FROM `{BQ_PROJECT_ID}.nbh_intelligence.past_meetings`
-        WHERE CAST(`Meeting ID` AS STRING) != @current_id
+        WHERE CAST(Meeting_ID AS STRING) != @current_id
           AND (
-               LOWER(CAST(`Brand Name` AS STRING)) = @brand_exact
-               OR LOWER(CAST(`Brand Name` AS STRING)) LIKE CONCAT('%', @brand_exact, '%')
-               OR LOWER(CAST(`Meeting Title` AS STRING)) LIKE CONCAT('%', @brand_exact, '%')
+               LOWER(CAST(Brand_Name AS STRING)) = @brand_exact
+               OR LOWER(CAST(Brand_Name AS STRING)) LIKE CONCAT('%', @brand_exact, '%')
+               OR LOWER(CAST(Meeting_Title AS STRING)) LIKE CONCAT('%', @brand_exact, '%')
                {domain_clauses}
           )
-        ORDER BY `Meeting Date` DESC
+        ORDER BY CAST(Meeting_Date AS STRING) DESC
         LIMIT 5
         """
         job_config = bigquery.QueryJobConfig(
@@ -1191,37 +1191,35 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
 
             matched_same_team = []
             for r in past_rows:
-                # Convert BigQuery row to a case-insensitive dictionary
-                row_dict = {k.lower(): v for k, v in dict(r.items()).items()}
+                # Convert BigQuery row to a normalized dictionary: lowercased and stripped of all spaces/underscores
+                # e.g., 'Key_Discussion_Points' -> 'keydiscussionpoints'
+                raw_dict = dict(r.items())
+                row_dict = {re.sub(r'[^a-z0-9]', '', str(k).lower()): v for k, v in raw_dict.items()}
                 
-                # Extract attendee strings regardless of column name variations
-                prev_nbh_raw = str(
-                    row_dict.get('nobroker attendees') or 
-                    row_dict.get('nobroker_attendees') or 
-                    row_dict.get('attendees') or ""
-                )
+                # Extract attendee strings safely
+                prev_nbh_raw = str(row_dict.get('nobrokerattendees') or row_dict.get('attendees') or "")
 
                 is_same_team = check_rep_overlap(prev_nbh_raw)
 
                 meeting_info = {
-                    "date": str(row_dict.get('meeting date') or row_dict.get('meeting_date') or "Recent"),
-                    "brand_name": str(row_dict.get('brand name') or row_dict.get('brand_name') or current_target_brand_name),
-                    "agenda": str(row_dict.get('meeting agenda') or row_dict.get('meeting title') or "Discussion"),
-                    "discussion": str(row_dict.get('key discussion points') or "Past campaign review and resident monetization options"),
-                    "questions": str(row_dict.get('key questions') or "None logged"),
-                    "actions": str(row_dict.get('action items') or "Share customized proposal and society availability"),
-                    "budget": str(row_dict.get('budget scope') or "Not specified"),
-                    "lead_cat": str(row_dict.get('lead category') or "Standard"),
-                    "positives": str(row_dict.get('positive factors') or "High interest in gated society resident engagement"),
-                    "negatives": str(row_dict.get('negative factors') or "Requires ROI and conversion data"),
-                    "sentiment": str(row_dict.get('overall client sentiment') or "Positive"),
-                    "pain_points": str(row_dict.get('client pain points') or "Need qualified customer acquisition"),
-                    "competition": str(row_dict.get('competition discussion') or row_dict.get('specific competitor insights') or "None logged"),
-                    "pitch_rating": str(row_dict.get('pitch rating') or "8/10"),
-                    "brand_traits": str(row_dict.get('brand traits') or "Growth-focused"),
-                    "tone": str(row_dict.get('tone of voice') or "Professional"),
-                    "customer_needs": str(row_dict.get('customer needs') or "Resident reach and footfall"),
-                    "assets": str(row_dict.get('marketing assets') or "Canopy & App Banners"),
+                    "date": str(row_dict.get('meetingdate') or "Recent"),
+                    "brand_name": str(row_dict.get('brandname') or current_target_brand_name),
+                    "agenda": str(row_dict.get('meetingagenda') or row_dict.get('meetingtitle') or "Discussion"),
+                    "discussion": str(row_dict.get('keydiscussionpoints') or "Past campaign review and resident monetization options"),
+                    "questions": str(row_dict.get('keyquestions') or "None logged"),
+                    "actions": str(row_dict.get('actionitems') or "Share customized proposal and society availability"),
+                    "budget": str(row_dict.get('budgetscope') or "Not specified"),
+                    "lead_cat": str(row_dict.get('leadcategory') or "Standard"),
+                    "positives": str(row_dict.get('positivefactors') or "High interest in gated society resident engagement"),
+                    "negatives": str(row_dict.get('negativefactors') or "Requires ROI and conversion data"),
+                    "sentiment": str(row_dict.get('overallclientsentiment') or "Positive"),
+                    "pain_points": str(row_dict.get('clientpainpoints') or "Need qualified customer acquisition"),
+                    "competition": str(row_dict.get('competitiondiscussion') or row_dict.get('specificcompetitorinsights') or "None logged"),
+                    "pitch_rating": str(row_dict.get('pitchrating') or "8/10"),
+                    "brand_traits": str(row_dict.get('brandtraits') or "Growth-focused"),
+                    "tone": str(row_dict.get('toneofvoice') or "Professional"),
+                    "customer_needs": str(row_dict.get('customerneeds') or "Resident reach and footfall"),
+                    "assets": str(row_dict.get('marketingassets') or "Canopy & App Banners"),
                     "nbh_team": prev_nbh_raw
                 }
 
