@@ -1090,7 +1090,7 @@ def extract_strict_campaigns_and_case_studies(file_data_obj, fname, brand_clean,
     return final_output
 
 # ==============================================================================
-# SUB-SECOND BIGQUERY MULTI-SIGNAL INTELLIGENCE ENGINE (Brand + Domain + Rep + Conducted)
+# SUB-SECOND BIGQUERY MULTI-SIGNAL INTELLIGENCE ENGINE (Verified Schema)
 # ==============================================================================
 BQ_PROJECT_ID = "nbh-meeting-bot-live"
 bq_client = bigquery.Client(project=BQ_PROJECT_ID, location="us-central1")
@@ -1132,6 +1132,8 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
                 if len(part) >= 3:
                     current_nbh_reps.add(part)
 
+    print(f"    👤 [Current NBH Reps to Match]: {current_nbh_reps}")
+
     # 2. EXTRACT CLIENT EMAIL DOMAINS & SPECIFIC EMAILS
     client_domains = set()
     client_specific_emails = set()
@@ -1140,21 +1142,20 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
         if '@' in email:
             client_specific_emails.add(email)
             domain = email.split('@')[1].strip()
-            # Ignore public personal webmail providers
             if domain not in ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'rediffmail.com', 'icloud.com']:
                 client_domains.add(domain)
 
-    # 3. MULTI-BRAND TOKEN EXTRACTION (Fixes "Sun Pharma - Revital" -> captures BOTH)
+    # 3. MULTI-BRAND TOKEN EXTRACTION (Extracts BOTH "Sun Pharma" and "Revital")
     brand_tokens = set()
     if current_target_brand_name and current_target_brand_name.lower() not in ['unknown', 'unknown brand', '']:
         brand_tokens.add(current_target_brand_name.lower().strip())
 
-    # Split title by common delimiters (e.g., 'Sun Pharma - Revital X NBH' -> 'Sun Pharma', 'Revital')
+    # Deconstruct Title to capture Parent Companies and Sub-Brands
     clean_title_part = re.split(r'\s*x\s*|\s*<>\s*|\s*\|\s*', meeting_title, flags=re.IGNORECASE)[0]
     sub_parts = re.split(r'[-–—/()]', clean_title_part)
     for p in sub_parts:
         cleaned_p = p.strip().lower()
-        if len(cleaned_p) >= 3 and cleaned_p not in ['nobrokerhood', 'nbh', 'meeting', 'discussion', 'connect', 'partnership']:
+        if len(cleaned_p) >= 3 and cleaned_p not in ['nobrokerhood', 'nbh', 'meeting', 'discussion', 'connect', 'partnership', 'test']:
             brand_tokens.add(cleaned_p)
 
     print(f"    🔍 [Search Criteria]: Brand Tokens={brand_tokens} | Client Domains={client_domains}")
@@ -1188,7 +1189,7 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
         search_clauses.append(f"LOWER(CAST(Brand_Name AS STRING)) LIKE '%{safe_tok}%'")
         search_clauses.append(f"LOWER(CAST(Meeting_Title AS STRING)) LIKE '%{safe_tok}%'")
 
-    # Client Domain clauses (e.g. sunpharma.com, mcsaatchiperformance.com)
+    # Client Domain clauses
     for dom in client_domains:
         safe_dom = dom.replace("'", "\\'")
         search_clauses.append(f"LOWER(CAST(Client_Attendees AS STRING)) LIKE '%{safe_dom}%'")
@@ -1196,18 +1197,14 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
     if search_clauses:
         combined_where = " OR ".join(search_clauses)
         
-        # PRIORITIZE: Meetings that were Conducted / Have Notes first, then newest date
+        # PRIORITIZE: 'Conducted' meetings first, then newest date
         history_sql = f"""
         SELECT *
         FROM `{BQ_PROJECT_ID}.nbh_intelligence.past_meetings`
         WHERE CAST(Meeting_ID AS STRING) != @current_id
           AND ({combined_where})
         ORDER BY 
-          CASE 
-            WHEN LOWER(CAST(Meeting_Done AS STRING)) = 'conducted' THEN 1
-            WHEN Key_Discussion_Points IS NOT NULL AND TRIM(CAST(Key_Discussion_Points AS STRING)) != '' THEN 2
-            ELSE 3 
-          END ASC,
+          CASE WHEN LOWER(CAST(Meeting_Done AS STRING)) = 'conducted' THEN 1 ELSE 2 END ASC,
           CAST(Meeting_Date AS STRING) DESC
         LIMIT 8
         """
@@ -1232,11 +1229,9 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
 
                 is_matched = check_overlap(prev_nbh_raw, prev_client_raw)
 
-                # Extract Conducted Status
                 meeting_done_status = str(row_dict.get('meetingdone') or "").strip().lower()
                 disc_points = str(row_dict.get('keydiscussionpoints') or "").strip()
 
-                # Handle "Not Conducted" past meeting gracefully
                 if "not conducted" in meeting_done_status and (not disc_points or disc_points.lower() in ['none', 'null', 'nan']):
                     disc_points = f"Previous scheduled discussion on {str(row_dict.get('meetingdate') or 'earlier date')} was logged as Not Conducted. This meeting restarts the engagement."
 
