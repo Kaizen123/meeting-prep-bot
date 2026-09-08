@@ -1093,8 +1093,22 @@ def extract_strict_campaigns_and_case_studies(file_data_obj, fname, brand_clean,
 # SUB-SECOND BIGQUERY MULTI-SIGNAL INTELLIGENCE ENGINE V2 (PRODUCTION READY)
 # ==============================================================================
 BQ_PROJECT_ID = "nbh-meeting-bot-live"
-bq_client = bigquery.Client(project=BQ_PROJECT_ID, location="us-central1")
+from google.auth import default as google_auth_default
 
+# Explicitly request Drive scope alongside cloud-platform,
+# required because past_meetings is a Sheets-backed external table
+credentials, _ = google_auth_default(
+    scopes=[
+        "https://www.googleapis.com/auth/cloud-platform",
+        "https://www.googleapis.com/auth/drive",
+    ]
+)
+
+bq_client = bigquery.Client(
+    project=BQ_PROJECT_ID,
+    credentials=credentials,
+    location="us-central1"
+)
 def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_client, 
                                     current_target_brand_name, target_brand_industry, current_meeting_data, 
                                     EXCLUDED_NBH_PSEUDO_NAMES_FOR_FOLLOWUP, AGENT_EMAIL, master_sheet_id, email_to_geo_map=None):
