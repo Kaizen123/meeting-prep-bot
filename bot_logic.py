@@ -1090,7 +1090,7 @@ def extract_strict_campaigns_and_case_studies(file_data_obj, fname, brand_clean,
     return final_output
 
 # ==============================================================================
-# SUB-SECOND BIGQUERY INTELLIGENCE ENGINE (Fixed Schema & Normalized Keys)
+# SUB-SECOND BIGQUERY MULTI-SIGNAL INTELLIGENCE ENGINE (Brand + Domain + Rep + Conducted)
 # ==============================================================================
 BQ_PROJECT_ID = "nbh-meeting-bot-live"
 bq_client = bigquery.Client(project=BQ_PROJECT_ID, location="us-central1")
@@ -1101,7 +1101,9 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
     
     global GDRIVE_FILE_CACHE
     if email_to_geo_map is None: email_to_geo_map = {}
-    print(f"⚡ [BigQuery Intel] Searching past meetings for brand: '{current_target_brand_name}'...")
+    
+    meeting_title = current_meeting_data.get('title', '')
+    print(f"⚡ [BigQuery Intel] Multi-Signal Search for Title: '{meeting_title}' | Inferred Brand: '{current_target_brand_name}'...")
     
     # Extract Target Cities and Departments for Attendees
     target_cities = set()
@@ -1118,7 +1120,7 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
     has_other_past_interactions = False 
     condensed_past_meetings_for_alert = []
 
-    # 1. Extract Current NBH Rep Identifier Tokens (e.g. 'jamilisathwik', 'amisha', 'ankita')
+    # 1. EXTRACT CURRENT NBH REPS (For Rep-Overlap Verification)
     current_nbh_reps = set()
     for att in current_meeting_data.get('nbh_attendees', []):
         em = str(att.get('email', '')).lower().strip()
@@ -1126,86 +1128,123 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
             current_nbh_reps.add(em)
             prefix = em.split('@')[0]
             current_nbh_reps.add(prefix)
-            # Add split parts (e.g., 'jamili', 'sathwik')
             for part in re.split(r'[^a-z0-9]', prefix):
                 if len(part) >= 3:
                     current_nbh_reps.add(part)
 
-    print(f"    👤 [Current NBH Reps to Match]: {current_nbh_reps}")
-
-    # 2. Extract Client Domains
+    # 2. EXTRACT CLIENT EMAIL DOMAINS & SPECIFIC EMAILS
     client_domains = set()
+    client_specific_emails = set()
     for att in current_meeting_data.get('brand_attendees_info', []):
-        email = att.get('email', '').lower()
+        email = att.get('email', '').lower().strip()
         if '@' in email:
+            client_specific_emails.add(email)
             domain = email.split('@')[1].strip()
+            # Ignore public personal webmail providers
             if domain not in ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'rediffmail.com', 'icloud.com']:
                 client_domains.add(domain)
 
-    # 3. Clean Brand Name (Handles LG, MG, HP, Tanishq, Bluestone, etc.)
-    target_clean = (current_target_brand_name or "").lower().strip()
+    # 3. MULTI-BRAND TOKEN EXTRACTION (Fixes "Sun Pharma - Revital" -> captures BOTH)
+    brand_tokens = set()
+    if current_target_brand_name and current_target_brand_name.lower() not in ['unknown', 'unknown brand', '']:
+        brand_tokens.add(current_target_brand_name.lower().strip())
+
+    # Split title by common delimiters (e.g., 'Sun Pharma - Revital X NBH' -> 'Sun Pharma', 'Revital')
+    clean_title_part = re.split(r'\s*x\s*|\s*<>\s*|\s*\|\s*', meeting_title, flags=re.IGNORECASE)[0]
+    sub_parts = re.split(r'[-–—/()]', clean_title_part)
+    for p in sub_parts:
+        cleaned_p = p.strip().lower()
+        if len(cleaned_p) >= 3 and cleaned_p not in ['nobrokerhood', 'nbh', 'meeting', 'discussion', 'connect', 'partnership']:
+            brand_tokens.add(cleaned_p)
+
+    print(f"    🔍 [Search Criteria]: Brand Tokens={brand_tokens} | Client Domains={client_domains}")
     current_meeting_id = str(current_meeting_data.get('id', '')).strip()
 
-    def check_rep_overlap(past_nbh_raw_str):
-        """Returns True if at least ONE NoBroker attendee matches the past meeting."""
-        if not current_nbh_reps:
-            return True
-        clean_past = str(past_nbh_raw_str).lower()
-        for rep in current_nbh_reps:
-            if rep in clean_past:
+    def check_overlap(past_nbh_raw, past_client_raw):
+        """Matches if EITHER at least one NBH rep matches OR at least one Client attendee matches."""
+        clean_past_nbh = str(past_nbh_raw).lower()
+        clean_past_client = str(past_client_raw).lower()
+
+        # Check Client Email exact match
+        for client_em in client_specific_emails:
+            if client_em in clean_past_client:
                 return True
+
+        # Check NBH Rep match
+        for rep in current_nbh_reps:
+            if rep in clean_past_nbh:
+                return True
+
         return False
 
     # ==============================================================================
-    # SUB-SECOND BIGQUERY ENGINE (UPDATED WITH UNDERSCORES FOR LIVE EXTERNAL TABLE)
+    # SUB-SECOND BIGQUERY MULTI-SIGNAL QUERY
     # ==============================================================================
-    if target_clean and target_clean not in ['unknown', 'unknown brand', '']:
-        domain_clauses = ""
-        if client_domains:
-            d_list = [f"LOWER(CAST(Client_Attendees AS STRING)) LIKE '%{dom}%'" for dom in client_domains]
-            domain_clauses = " OR " + " OR ".join(d_list)
+    search_clauses = []
 
+    # Brand and Title token clauses
+    for tok in brand_tokens:
+        safe_tok = tok.replace("'", "\\'")
+        search_clauses.append(f"LOWER(CAST(Brand_Name AS STRING)) LIKE '%{safe_tok}%'")
+        search_clauses.append(f"LOWER(CAST(Meeting_Title AS STRING)) LIKE '%{safe_tok}%'")
+
+    # Client Domain clauses (e.g. sunpharma.com, mcsaatchiperformance.com)
+    for dom in client_domains:
+        safe_dom = dom.replace("'", "\\'")
+        search_clauses.append(f"LOWER(CAST(Client_Attendees AS STRING)) LIKE '%{safe_dom}%'")
+
+    if search_clauses:
+        combined_where = " OR ".join(search_clauses)
+        
+        # PRIORITIZE: Meetings that were Conducted / Have Notes first, then newest date
         history_sql = f"""
         SELECT *
         FROM `{BQ_PROJECT_ID}.nbh_intelligence.past_meetings`
         WHERE CAST(Meeting_ID AS STRING) != @current_id
-          AND (
-               LOWER(CAST(Brand_Name AS STRING)) = @brand_exact
-               OR LOWER(CAST(Brand_Name AS STRING)) LIKE CONCAT('%', @brand_exact, '%')
-               OR LOWER(CAST(Meeting_Title AS STRING)) LIKE CONCAT('%', @brand_exact, '%')
-               {domain_clauses}
-          )
-        ORDER BY CAST(Meeting_Date AS STRING) DESC
-        LIMIT 5
+          AND ({combined_where})
+        ORDER BY 
+          CASE 
+            WHEN LOWER(CAST(Meeting_Done AS STRING)) = 'conducted' THEN 1
+            WHEN Key_Discussion_Points IS NOT NULL AND TRIM(CAST(Key_Discussion_Points AS STRING)) != '' THEN 2
+            ELSE 3 
+          END ASC,
+          CAST(Meeting_Date AS STRING) DESC
+        LIMIT 8
         """
+        
         job_config = bigquery.QueryJobConfig(
             query_parameters=[
-                bigquery.ScalarQueryParameter("brand_exact", "STRING", target_clean),
                 bigquery.ScalarQueryParameter("current_id", "STRING", current_meeting_id)
             ]
         )
         try:
             query_job = bq_client.query(history_sql, job_config=job_config, location="us-central1")
             past_rows = list(query_job.result())
-            print(f"    📊 [BigQuery Response]: Found {len(past_rows)} past meetings for '{target_clean}'.")
+            print(f"    📊 [BigQuery Multi-Signal Response]: Found {len(past_rows)} past meetings.")
 
             matched_same_team = []
             for r in past_rows:
-                # Convert BigQuery row to a normalized dictionary: lowercased and stripped of all spaces/underscores
-                # e.g., 'Key_Discussion_Points' -> 'keydiscussionpoints'
                 raw_dict = dict(r.items())
                 row_dict = {re.sub(r'[^a-z0-9]', '', str(k).lower()): v for k, v in raw_dict.items()}
                 
-                # Extract attendee strings safely
                 prev_nbh_raw = str(row_dict.get('nobrokerattendees') or row_dict.get('attendees') or "")
+                prev_client_raw = str(row_dict.get('clientattendees') or "")
 
-                is_same_team = check_rep_overlap(prev_nbh_raw)
+                is_matched = check_overlap(prev_nbh_raw, prev_client_raw)
+
+                # Extract Conducted Status
+                meeting_done_status = str(row_dict.get('meetingdone') or "").strip().lower()
+                disc_points = str(row_dict.get('keydiscussionpoints') or "").strip()
+
+                # Handle "Not Conducted" past meeting gracefully
+                if "not conducted" in meeting_done_status and (not disc_points or disc_points.lower() in ['none', 'null', 'nan']):
+                    disc_points = f"Previous scheduled discussion on {str(row_dict.get('meetingdate') or 'earlier date')} was logged as Not Conducted. This meeting restarts the engagement."
 
                 meeting_info = {
                     "date": str(row_dict.get('meetingdate') or "Recent"),
                     "brand_name": str(row_dict.get('brandname') or current_target_brand_name),
                     "agenda": str(row_dict.get('meetingagenda') or row_dict.get('meetingtitle') or "Discussion"),
-                    "discussion": str(row_dict.get('keydiscussionpoints') or "Past campaign review and resident monetization options"),
+                    "discussion": disc_points if disc_points else "Past campaign review and resident monetization options",
                     "questions": str(row_dict.get('keyquestions') or "None logged"),
                     "actions": str(row_dict.get('actionitems') or "Share customized proposal and society availability"),
                     "budget": str(row_dict.get('budgetscope') or "Not specified"),
@@ -1223,9 +1262,9 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
                     "nbh_team": prev_nbh_raw
                 }
 
-                if is_same_team:
+                if is_matched:
                     matched_same_team.append(meeting_info)
-                    print(f"    ✅ MATCHED Follow-Up: '{meeting_info['agenda']}' ({meeting_info['date']}) with same NBH rep!")
+                    print(f"    ✅ MATCHED Follow-Up: '{meeting_info['agenda']}' ({meeting_info['date']}) with overlapping attendees/domain!")
                 else:
                     has_other_past_interactions = True
                     condensed_past_meetings_for_alert.append({
@@ -1279,7 +1318,7 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
                 matches = extract_strict_campaigns_and_case_studies(
                     file_data_obj=file_data_obj,
                     fname=fname,
-                    brand_clean=target_clean,
+                    brand_clean=current_target_brand_name.lower().strip() if current_target_brand_name else "",
                     strict_keywords=strict_keywords,
                     sub_category_keywords=sub_category_keywords,
                     target_cities=target_cities,
@@ -1293,7 +1332,7 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
                 matches = extract_strict_campaigns_and_case_studies(
                     file_data_obj=file_data_obj,
                     fname=fname,
-                    brand_clean=target_clean,
+                    brand_clean=current_target_brand_name.lower().strip() if current_target_brand_name else "",
                     strict_keywords=strict_keywords,
                     sub_category_keywords=sub_category_keywords,
                     target_cities=target_cities,
