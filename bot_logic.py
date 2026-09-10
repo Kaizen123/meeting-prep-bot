@@ -1273,11 +1273,16 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
                         "nbh_team": prev_nbh_raw
                     })
 
+            matched_past_context = None
             if matched_same_team:
                 is_overall_direct_follow_up = True
                 top = matched_same_team[0]
+                matched_past_context = top  # Captured for smart image generation
+                clean_nbh_past = str(top['nbh_team']).replace("'", "").replace("[", "").replace("]", "").strip()
+
                 history_context_str = f"""## PREVIOUS MEETING INTELLIGENCE (MATCHED)
-- **Account Matched:** {top['brand_name']} (Last Met: {top['date']})
+- **Last Meeting Conducted:** Date: {top['date']} | NBH Attendees: {clean_nbh_past}
+- **Account Matched:** {top['brand_name']}
 - **Overall Sentiment & Health:** Sentiment: {top['sentiment']} | Pitch Rating: {top['pitch_rating']}
 - **Deal Scope:** Lead Category: {top['lead_cat']} | Budget Scope: {top['budget']}
 - **Last Key Discussion:** {top['discussion']}
@@ -1293,6 +1298,7 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
         except Exception as e:
             print(f"    ⚠️ BigQuery history read error: {e}")
             history_context_str = "## PREVIOUS MEETING INTELLIGENCE: NONE (Fresh Meeting)\n"
+            matched_past_context = None
 
     # --- 4. LIVE CAMPAIGNS & CASE STUDIES (Cached & Scanned from Drive) ---
     campaign_entries = []
@@ -1354,7 +1360,8 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
         "llm_summary_string": final_llm_string,
         "is_overall_direct_follow_up": is_overall_direct_follow_up,
         "has_other_past_interactions": has_other_past_interactions,
-        "condensed_past_meetings_for_alert": condensed_past_meetings_for_alert
+        "condensed_past_meetings_for_alert": condensed_past_meetings_for_alert,
+        "matched_past_context": matched_past_context
     }
 # --- Calendar Processing ---
 def get_upcoming_meetings(calendar_service, calendar_id='primary', time_delta_hours=36):
@@ -1754,33 +1761,51 @@ def generate_brief_with_gemini(gemini_llm_client, YOUR_DETAILED_PROMPT_TEMPLATE_
 # =====================================================================
 # UNIFIED HIGH-QUALITY IMAGE GENERATION WORKFLOW
 # =====================================================================
-def get_brand_visual_context(gemini_client, brand_name, industry, generated_brief=""):
+def get_brand_visual_context(gemini_client, brand_name, industry, generated_brief="", past_meeting_context=None):
     """
-    Acts as the Creative Director: Analyzes the pre-meeting brief and industry context
-    to extract active campaigns, select target audiences, and dynamically generate 
-    the conversion-oriented caption for Panel 3.
+    Acts as Creative Director:
+    - For Follow-Up Meetings: Uses past discussion (Deal Drivers / Positives & Action Items) as primary creative direction.
+    - For Fresh Meetings: Uses public news & active market campaigns.
     """
     if not gemini_client: 
         return None
-    
+
+    followup_guidance = ""
+    if past_meeting_context and isinstance(past_meeting_context, dict):
+        positives = past_meeting_context.get('positives', '')
+        actions = past_meeting_context.get('actions', '')
+        discussion = past_meeting_context.get('discussion', '')
+        
+        followup_guidance = f"""
+    # CRITICAL FOLLOW-UP CREATIVE INSTRUCTION:
+    This is a FOLLOW-UP meeting with prior discussion history:
+    - Positive Factors / What Worked: {positives}
+    - Agreed Action Items & Pitch Angles: {actions}
+    - Past Discussion: {discussion}
+
+    YOUR PRIMARY CREATIVE OBJECTIVE:
+    Base the visual theme, campaign scene, and slogan DIRECTLY on the specific client interest discussed previously (e.g., if female audience targeting, IVF, festive campaigns, or specific product lines were discussed, the 3 panels MUST reflect that exact pitch!).
+    Only if the past points are completely empty or generic, fall back to general active campaigns.
+    """
+
     prompt = f"""
     You are an expert Brand Visual Strategist and Creative Director at a top ad agency. 
     Analyze the generated Pre-Meeting Brief below for the brand '{brand_name}' (Industry: {industry}):
     ---
     {generated_brief}
     ---
+    {followup_guidance}
     
     Task:
     1. is_well_known: Set to true ONLY if '{brand_name}' is a widely recognized national or multinational brand with established guidelines, recognizable logos, and clear visual identifiers in India (e.g., McDonald's, KFC, Coca-Cola, Tanishq, Puma, Horlicks, Swiggy, Amazon). Set to false if the brand is highly localized, a minor regional outlet, or obscure.
     2. primary_colors: Identify their exact 2 primary brand colors (e.g., McDonald's is "Golden Yellow and Crimson Red", Tanishq is "Deep Maroon and Gold").
-    3. THE PITCH / CREATIVE HOOK: Scan the provided brief carefully. Focus specifically on the real-world, active, and researched campaigns of the brand mentioned in the text. Avoid generic themes.
-    4. CREATE THE VISUAL SCENE: Combine the identified creative campaign/theme with premium, minimalist visual staging. 
+    3. THE PITCH / CREATIVE HOOK: Follow the Prioritized Guidance above. Focus specifically on the agreed pitch angle, positive factors from past meetings, or live active campaigns. Avoid generic fluff.
+    4. CREATE THE VISUAL SCENE: Combine the identified creative theme with premium, minimalist visual staging. 
        - EXCLUSION: Do not depict physical booths, tents, kiosks, or sampling structures. Focus solely on clean static print ads and graphic layouts on the gate, inside the elevator, and on the mobile interface.
-    5. CREATE A SLOGAN: Extract the exact slogan proposed in the brief's creative hook, or draft a short, impactful 2-to-3 word slogan that matches the strategic pitch.
+    5. CREATE A SLOGAN: Extract or craft a short, impactful 2-to-3 word slogan that matches the strategic pitch.
     6. DEDUCE TARGET AUDIENCE (DYNAMIC & SEMANTIC MATCHING):
        - Create a concise description of 1 or 2 specific Indian residents standing near or interacting with the advertisement.
        - The characters must match the exact nature and purchase intent of the brand.
-       - Match the industry naturally.
     7. GENERATE DYNAMIC PANEL 3 CAPTION (MUST BE UNDER 12 WORDS):
        - Ensure caption_panel3 (Conversion Stage) matches the industry conversion metric exactly:
          - FMCG / Food / Quick Commerce: "Bringing your brand back when residents are ready to order."
@@ -2946,12 +2971,19 @@ def main():
             internal_nbh_data_for_brand_str
         )
 
-        # Step 8: Generate Creative Mockup Image
+        # Step 8: Generate Creative Mockup Image (Smart Bifurcation: Fresh vs Follow-up)
         creative_image_bytes = None
         if ENABLE_IMAGE_GENERATION and generated_brief and "Error:" not in generated_brief:
             try:
                 print(f"  🎨 Generating strategic mockup image for '{meeting_data['title']}'...")
-                visual_context = get_brand_visual_context(gemini_llm_client, meeting_data['brand_name'], meeting_data['industry'], generated_brief)
+                matched_past = internal_data_result.get("matched_past_context")
+                visual_context = get_brand_visual_context(
+                    gemini_llm_client, 
+                    meeting_data['brand_name'], 
+                    meeting_data['industry'], 
+                    generated_brief,
+                    past_meeting_context=matched_past
+                )
                 if visual_context:
                     creative_image_bytes = generate_creative_with_gemini_image(gemini_llm_client, meeting_data['brand_name'], meeting_data['industry'], visual_context)
             except Exception as e:
