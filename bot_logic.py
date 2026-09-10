@@ -1134,19 +1134,18 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
     has_other_past_interactions = False 
     condensed_past_meetings_for_alert = []
 
-    # 1. EXTRACT CURRENT NBH REPS (For Rep-Overlap Verification)
-    current_nbh_reps = set()
+    # 1. EXTRACT CURRENT NBH REPS (Exact Email and Username Prefix)
+    current_nbh_emails = set()
+    current_nbh_prefixes = set()
     for att in current_meeting_data.get('nbh_attendees', []):
         em = str(att.get('email', '')).lower().strip()
         if em and not any(ign in em for ign in ['hoodbrand', 'brand.vmeet', 'pia', 'meetings.regional', 'nobrokerhood']):
-            current_nbh_reps.add(em)
-            prefix = em.split('@')[0]
-            current_nbh_reps.add(prefix)
-            for part in re.split(r'[^a-z0-9]', prefix):
-                if len(part) >= 3:
-                    current_nbh_reps.add(part)
+            current_nbh_emails.add(em)
+            prefix = em.split('@')[0].strip()
+            if prefix:
+                current_nbh_prefixes.add(prefix)
 
-    print(f"    👤 [Current NBH Reps to Match]: {current_nbh_reps}")
+    print(f"    👤 [Current NBH Reps to Match]: Emails={current_nbh_emails} | Prefixes={current_nbh_prefixes}")
 
     # 2. EXTRACT MULTI-BRAND TOKENS FROM TITLE (Captures BOTH Parent & Sub-brand)
     brand_tokens = set()
@@ -1159,13 +1158,11 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
         if len(cleaned_p) >= 3 and cleaned_p not in ['nobrokerhood', 'nbh', 'meeting', 'discussion', 'connect', 'partnership', 'test']:
             brand_tokens.add(cleaned_p)
 
-    # 3. EXTRACT CLIENT EMAIL DOMAINS
+    # 3. EXTRACT CLIENT EMAIL DOMAINS (For BigQuery Search)
     client_domains = set()
-    client_specific_emails = set()
     for att in current_meeting_data.get('brand_attendees_info', []):
         email = att.get('email', '').lower().strip()
         if '@' in email:
-            client_specific_emails.add(email)
             domain = email.split('@')[1].strip()
             if domain not in ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'rediffmail.com', 'icloud.com']:
                 client_domains.add(domain)
@@ -1215,13 +1212,27 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
                 row_dict = {re.sub(r'[^a-z0-9]', '', str(k).lower()): v for k, v in raw_dict.items()}
                 
                 prev_nbh_raw = str(row_dict.get('nobrokerattendees') or row_dict.get('attendees') or "")
-                prev_client_raw = str(row_dict.get('clientattendees') or "").lower()
-
-                # 1-ATTENDEE OVERLAP RULE: Match if at least 1 NBH rep OR 1 Client email matches!
+                
+                # --- STRICT NBH ATTENDEE OVERLAP CHECK ---
+                # A meeting is ONLY a follow-up if at least ONE NBH rep from today was in that past meeting!
                 clean_past_nbh = prev_nbh_raw.lower()
-                is_nbh_match = any(rep in clean_past_nbh for rep in current_nbh_reps) if current_nbh_reps else False
-                is_client_match = any(c_em in prev_client_raw for c_em in client_specific_emails) if client_specific_emails else False
-                is_matched = is_nbh_match or is_client_match or (not current_nbh_reps and not client_specific_emails)
+                is_nbh_match = False
+                
+                # 1. Check exact email match
+                for em in current_nbh_emails:
+                    if em in clean_past_nbh:
+                        is_nbh_match = True
+                        break
+                        
+                # 2. Check full username prefix match with word boundaries (e.g. 'manudhi.yadav')
+                if not is_nbh_match:
+                    for prefix in current_nbh_prefixes:
+                        if re.search(r'\b' + re.escape(prefix) + r'\b', clean_past_nbh):
+                            is_nbh_match = True
+                            break
+
+                # STRICT RULE: Must have NBH attendee overlap. Client email match alone is NOT a follow-up!
+                is_matched = is_nbh_match
 
                 meeting_done_status = str(row_dict.get('meetingdone') or "").strip().lower()
                 disc_points = str(row_dict.get('keydiscussionpoints') or "").strip()
