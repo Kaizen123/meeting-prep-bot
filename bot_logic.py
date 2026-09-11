@@ -1279,10 +1279,43 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
                 top = matched_same_team[0]
                 matched_past_context = top  # Captured for smart image generation
                 clean_nbh_past = str(top['nbh_team']).replace("'", "").replace("[", "").replace("]", "").strip()
+                
+                # Check previous client attendees from the raw past row
+                past_client_raw = str(top.get('client_team') or "").lower()
+
+                # Build CRM-grounded intel for each brand attendee
+                attendee_intel_lines = []
+                for b_att in current_meeting_data.get('brand_attendees_info', []):
+                    b_email = b_att.get('email', '').lower().strip()
+                    b_name = b_att.get('name', b_email)
+                    b_prefix = b_email.split('@')[0] if '@' in b_email else b_email
+                    
+                    was_present = (b_email and b_email in past_client_raw) or (len(b_prefix) >= 3 and b_prefix in past_client_raw)
+                    
+                    if was_present:
+                        intel = (
+                            f"- **{b_name} ({b_email}):**\n"
+                            f"  - **Status:** Returning Attendee (attended previous call on {top['date']}).\n"
+                            f"  - **Past Stance & Concerns:** Stated pain points: \"{top['pain_points']}\" | Objections/Blockers: \"{top['negatives']}\" | Questions asked: \"{top['questions']}\".\n"
+                            f"  - **What Resonated:** \"{top['positives']}\"."
+                        )
+                    else:
+                        intel = (
+                            f"- **{b_name} ({b_email}):**\n"
+                            f"  - **Status:** New Stakeholder (was not in the previous call on {top['date']}).\n"
+                            f"  - **Context:** Joining the discussion following earlier meetings held with the brand team."
+                        )
+                    attendee_intel_lines.append(intel)
+
+                attendee_intel_str = "\n".join(attendee_intel_lines) if attendee_intel_lines else "- No specific client attendee history found."
 
                 history_context_str = f"""## PREVIOUS MEETING INTELLIGENCE (MATCHED)
 - **Last Meeting Conducted:** Date: {top['date']} | NBH Attendees: {clean_nbh_past}
 - **Account Matched:** {top['brand_name']}
+
+### Brand Attendee CRM Audit (Historical Facts):
+{attendee_intel_str}
+
 - **Overall Sentiment & Health:** Sentiment: {top['sentiment']} | Pitch Rating: {top['pitch_rating']}
 - **Deal Scope:** Lead Category: {top['lead_cat']} | Budget Scope: {top['budget']}
 - **Last Key Discussion:** {top['discussion']}
