@@ -2474,14 +2474,14 @@ def update_events_in_sheets(sheet_id, events_to_update, sheets_service, excluded
     import time
     
     # Get Column indices for Master Sheet (Meeting_data)
-    master_sheet_columns = read_data_from_sheets(sheet_id, sheets_service, "Meeting_data!A1:BZ1")[0]
+    master_sheet_columns = read_data_from_sheets(sheet_id, sheets_service, "Meeting_data!A1:ZZ1")[0]
     owner_col_master = column_index[f"{master_sheet_columns.index('Owner') + 1}"]
     owner_update_col_master = column_index[f"{master_sheet_columns.index('Owner sheet to be updated') + 1}"]
     main_part_col = column_index[f"{master_sheet_columns.index('Main participant') + 1}"]
     meeting_done_col = column_index[f"{master_sheet_columns.index('Meeting Done') + 1}"]
 
     # Get Column indices for Audit Sheet
-    audit_sheet_columns = read_data_from_sheets(sheet_id, sheets_service, "Audit_and_Training!A1:BZ1")[0]
+    audit_sheet_columns = read_data_from_sheets(sheet_id, sheets_service, "Audit_and_Training!A1:ZZ1")[0]
     owner_col_audit = column_index[f"{audit_sheet_columns.index('Owner') + 1}"]
     owner_update_col_audit = column_index[f"{audit_sheet_columns.index('Owner sheet to be updated') + 1}"]
 
@@ -2719,8 +2719,8 @@ def main():
             email_to_geo_map[employee] = {'city': city, 'dept': dept}
 
     # Fetching column headers for master sheet and audit sheet
-    master_sheet_columns = read_data_from_sheets(master_sheet_id, sheets_service, "Meeting_data!A1:BZ1")[0]
-    audit_sheet_columns = read_data_from_sheets(master_sheet_id, sheets_service, "Audit_and_Training!A1:BZ1")[0]
+    master_sheet_columns = read_data_from_sheets(master_sheet_id, sheets_service, "Meeting_data!A1:ZZ1")[0]
+    audit_sheet_columns = read_data_from_sheets(master_sheet_id, sheets_service, "Audit_and_Training!A1:ZZ1")[0]
     
     global column_index_master
     global column_index_audit
