@@ -1333,56 +1333,168 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
             history_context_str = "## PREVIOUS MEETING INTELLIGENCE: NONE (Fresh Meeting)\n"
             matched_past_context = None
 
-    # --- 4. LIVE CAMPAIGNS & CASE STUDIES (Cached & Scanned from Drive) ---
+    # --- 4. LIVE CAMPAIGNS & CASE STUDIES (ADAPTIVE SUB-SECOND BIGQUERY NATIVE ENGINE) ---
     campaign_entries = []
     case_study_entries = []
-    
+
+    brand_clean = current_target_brand_name.lower().strip() if current_target_brand_name else ""
     strict_keywords = [target_brand_industry.lower()] if target_brand_industry and target_brand_industry != 'Unknown' else []
-    sub_category_keywords = current_meeting_data.get('sub_category_keywords', [])
+    sub_category_keywords = [k.strip().lower() for k in current_meeting_data.get('sub_category_keywords', []) if k and len(k.strip()) > 2]
+
+    print(f"⚡ [BigQuery Native DW]: Fetching Campaigns & Case Studies in 50ms...")
+
+    # Helper: Dynamically find column values without hardcoded schema fragility
+    def get_val(row_map, search_terms):
+        for k, v in row_map.items():
+            if any(term in k for term in search_terms):
+                val = str(v).strip()
+                if val and val.lower() not in ['none', 'nan', 'null', '']:
+                    return val
+        return ""
+
+    matches_camp_p, matches_camp_o = [], []
+    matches_sub_p, matches_sub_o = [], []
+    matches_ind_p, matches_ind_o = [], []
+
+    # 1. READ PHYSICAL & DIGITAL CAMPAIGNS FROM BIGQUERY NATIVE TABLES
+    for table_name, label in [("physical_campaigns", "Physical"), ("digital_campaigns", "Digital")]:
+        try:
+            sql = f"SELECT * FROM `{BQ_PROJECT_ID}.nbh_intelligence.{table_name}` LIMIT 150"
+            rows = list(bq_client.query(sql, location="us-central1").result())
+            
+            for r in rows:
+                row_map = {str(k).lower(): v for k, v in dict(r.items()).items()}
+                
+                # Adaptive Header Detection
+                r_brand = get_val(row_map, ["brand", "company"])
+                r_city = get_val(row_map, ["city"]).lower()
+                r_act = get_val(row_map, ["activity", "type", "media", "asset"])
+                r_date = get_val(row_map, ["date", "timestamp", "tentative"])
+                r_email = get_val(row_map, ["email"]).lower()
+                r_ind = get_val(row_map, ["industry", "vertical"]).lower()
+
+                if not r_brand or r_brand.lower() in ['unknown', 'none', 'nan']:
+                    continue
+
+                # Filter for recent execution years (2025/2026/2027)
+                full_row_text = " ".join([str(v) for v in row_map.values() if v])
+                if not any(yr in full_row_text for yr in ["2025", "2026", "2027"]):
+                    continue
+
+                # City & Department Geo Matching
+                geo_info = email_to_geo_map.get(r_email, {})
+                if not r_city:
+                    r_city = geo_info.get('city', '').lower()
+                r_dept = geo_info.get('dept', '').lower()
+
+                is_city_match = target_cities and r_city and any(tc in r_city for tc in target_cities)
+                is_dept_match = target_depts and r_dept and any(td in r_dept for td in target_depts)
+
+                tag = ""
+                is_priority = False
+                if is_city_match and is_dept_match and r_dept:
+                    tag = " [📍 SAME CITY & DEPT MATCH]"
+                    is_priority = True
+                elif is_city_match:
+                    tag = " [📍 SAME CITY MATCH]"
+                    is_priority = True
+
+                act_display = r_act if r_act else f"{label} Branding"
+                entry = f"- {r_brand} ({r_city.title() if r_city else 'National'}) | {act_display} | Date: {r_date}{tag}"
+                entry_lower = entry.lower()
+
+                # Priority 1: Exact Brand Match
+                if brand_clean and len(brand_clean) > 2 and (brand_clean in r_brand.lower() or r_brand.lower() in brand_clean):
+                    if is_priority and len(matches_camp_p) < 4:
+                        matches_camp_p.append(entry)
+                    elif not is_priority and len(matches_camp_o) < 4:
+                        matches_camp_o.append(entry)
+                # Priority 2: Sub-Category / Competitor Match
+                elif sub_category_keywords and any(k in entry_lower for k in sub_category_keywords):
+                    if is_priority and len(matches_sub_p) < 6:
+                        matches_sub_p.append(entry)
+                    elif not is_priority and len(matches_sub_o) < 6:
+                        matches_sub_o.append(entry)
+                # Priority 3: Broad Industry Fallback
+                elif strict_keywords and (any(k in r_ind for k in strict_keywords) or any(k in entry_lower for k in strict_keywords)):
+                    if is_priority and len(matches_ind_p) < 6:
+                        matches_ind_p.append(entry)
+                    elif not is_priority and len(matches_ind_o) < 6:
+                        matches_ind_o.append(entry)
+
+        except Exception as e_camp:
+            print(f"  ⚠️ Warning querying {table_name} from BigQuery: {e_camp}")
+
+    # Build prioritized Campaign list
+    if matches_camp_p or matches_camp_o:
+        campaign_entries.append("**Exact Brand Matches Found:**")
+        campaign_entries += matches_camp_p + matches_camp_o
+    if matches_sub_p or matches_sub_o:
+        campaign_entries.append("**Highly Relevant (Competitor/Sub-Category) Campaigns:**")
+        campaign_entries += matches_sub_p + matches_sub_o
+    if matches_ind_p or matches_ind_o:
+        campaign_entries.append("**Broad Industry Fallbacks (Low Relevance - Match ONLY if product category is identical):**")
+        campaign_entries += matches_ind_p + matches_ind_o
+
+    # 2. READ CASE STUDIES FROM BIGQUERY NATIVE TABLE
+    cs_brand_p, cs_brand_o = [], []
+    cs_sub_p, cs_sub_o = [], []
+    cs_ind_p, cs_ind_o = [], []
 
     try:
-        if not GDRIVE_FILE_CACHE and drive_service and NBH_GDRIVE_FOLDER_ID:
-            print("  📂 Loading Campaign & Case Study sheets from Google Drive into cache...")
-            gdrive_files = list_files_in_gdrive_folder(drive_service, NBH_GDRIVE_FOLDER_ID)
-            for f in gdrive_files:
-                fname = f.get('name', '')
-                fid = f.get('id', '')
-                fmime = f.get('mimeType', '')
-                if any(x in fname for x in [FILE_NAME_PHYSICAL_CAMPAIGNS_GSHEET, FILE_NAME_DIGITAL_CAMPAIGNS_GSHEET, FILE_NAME_LATEST_CASE_STUDIES_GSHEET]):
-                    print(f"    Loading sheet: '{fname}'")
-                    GDRIVE_FILE_CACHE[fname] = get_structured_gdrive_file_data(drive_service, sheets_service, fid, fname, fmime)
+        cs_sql = f"SELECT * FROM `{BQ_PROJECT_ID}.nbh_intelligence.case_studies` LIMIT 250"
+        cs_rows = list(bq_client.query(cs_sql, location="us-central1").result())
+        
+        for r in cs_rows:
+            row_map = {str(k).lower(): v for k, v in dict(r.items()).items()}
 
-        for fname, file_data_obj in GDRIVE_FILE_CACHE.items():
-            if FILE_NAME_PHYSICAL_CAMPAIGNS_GSHEET in fname or FILE_NAME_DIGITAL_CAMPAIGNS_GSHEET in fname:
-                matches = extract_strict_campaigns_and_case_studies(
-                    file_data_obj=file_data_obj,
-                    fname=fname,
-                    brand_clean=current_target_brand_name.lower().strip() if current_target_brand_name else "",
-                    strict_keywords=strict_keywords,
-                    sub_category_keywords=sub_category_keywords,
-                    target_cities=target_cities,
-                    target_depts=target_depts,
-                    email_to_geo_map=email_to_geo_map
-                )
-                if matches:
-                    campaign_entries.extend(matches)
+            c_brand = get_val(row_map, ["brand", "company"])
+            c_city = get_val(row_map, ["city"]).lower()
+            c_type = get_val(row_map, ["asset", "type", "campaign"])
+            c_obj = get_val(row_map, ["objective", "remark", "detail", "result"])
+            c_sub = get_val(row_map, ["sub"]).lower()
+            c_ind = get_val(row_map, ["industry", "vertical"]).lower()
 
-            elif FILE_NAME_LATEST_CASE_STUDIES_GSHEET in fname:
-                matches = extract_strict_campaigns_and_case_studies(
-                    file_data_obj=file_data_obj,
-                    fname=fname,
-                    brand_clean=current_target_brand_name.lower().strip() if current_target_brand_name else "",
-                    strict_keywords=strict_keywords,
-                    sub_category_keywords=sub_category_keywords,
-                    target_cities=target_cities,
-                    target_depts=target_depts,
-                    email_to_geo_map=email_to_geo_map
-                )
-                if matches:
-                    case_study_entries.extend(matches)
+            if not c_brand or c_brand.lower() in ['unknown', 'none', 'nan']:
+                continue
 
-    except Exception as e:
-        print(f"    ⚠️ Error scanning live campaign/case study sheets: {e}")
+            is_city_match = target_cities and c_city and any(tc in c_city for tc in target_cities)
+            tag = " [📍 SAME CITY MATCH]" if is_city_match else ""
+            is_priority = bool(is_city_match)
+
+            type_display = c_type if c_type else "Case Study"
+            obj_display = f" - {c_obj}" if c_obj else ""
+            entry = f"- {c_brand} ({c_city.title() if c_city else 'National'}): {type_display}{obj_display}{tag}"
+            entry_lower = entry.lower()
+
+            if brand_clean and len(brand_clean) > 2 and (brand_clean in c_brand.lower() or c_brand.lower() in brand_clean):
+                if is_priority and len(cs_brand_p) < 4:
+                    cs_brand_p.append(entry)
+                elif not is_priority and len(cs_brand_o) < 4:
+                    cs_brand_o.append(entry)
+            elif sub_category_keywords and (any(k in c_sub for k in sub_category_keywords) or any(k in entry_lower for k in sub_category_keywords)):
+                if is_priority and len(cs_sub_p) < 6:
+                    cs_sub_p.append(entry)
+                elif not is_priority and len(cs_sub_o) < 6:
+                    cs_sub_o.append(entry)
+            elif strict_keywords and (any(k in c_ind for k in strict_keywords) or any(k in entry_lower for k in strict_keywords)):
+                if is_priority and len(cs_ind_p) < 6:
+                    cs_ind_p.append(entry)
+                elif not is_priority and len(cs_ind_o) < 6:
+                    cs_ind_o.append(entry)
+
+    except Exception as e_cs:
+        print(f"  ⚠️ Warning querying case_studies from BigQuery: {e_cs}")
+
+    if cs_brand_p or cs_brand_o:
+        case_study_entries.append("**Exact Brand Case Studies:**")
+        case_study_entries += cs_brand_p + cs_brand_o
+    if cs_sub_p or cs_sub_o:
+        case_study_entries.append("**Highly Relevant (Competitor/Sub-Category) Campaigns:**")
+        case_study_entries += cs_sub_p + cs_sub_o
+    if cs_ind_p or cs_ind_o:
+        case_study_entries.append("**Broad Industry Fallbacks (Low Relevance - Match ONLY if product category is identical):**")
+        case_study_entries += cs_ind_p + cs_ind_o
 
     campaigns_str = "## NBH CAMPAIGN EXAMPLES\n" + ("\n".join(campaign_entries) if campaign_entries else "DATA_EMPTY: No physical or digital campaign data.")
     case_studies_str = "\n\n## NBH CASE STUDIES\n" + ("\n".join(case_study_entries) if case_study_entries else "DATA_EMPTY: No case studies available.")
