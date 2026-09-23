@@ -2358,12 +2358,12 @@ def send_unknown_brand_sop_email(gmail_service, meeting_data):
     )
     print(f"  📤 Sending Unknown Brand SOP Email for '{meeting_title}' TO Organizer: [{organizer}] | CC: {cc_list}")
     send_gmail_message(gmail_service, 'me', email_message)
-def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_bytes=None):
-    """Sends the brief email, injecting the AI creative if available. Includes TEST MODE."""
+def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_bytes=None, ppt_deck_url=None):
+    """Sends the brief email, injecting the AI creative and customized PPT pitch deck link if available."""
     EXCLUDED_EMAILS = {AGENT_EMAIL.lower(), "pia.brand@nobroker.in", "pia.hood@nobroker.in", "meetings.regional@gmail.com"} 
 
-    nbh_recipient_emails =[]
-    attendees_list = meeting_data.get('nbh_attendees',[]) 
+    nbh_recipient_emails = []
+    attendees_list = meeting_data.get('nbh_attendees', []) 
     if isinstance(attendees_list, list):
         for att in attendees_list:
             if isinstance(att, dict) and 'email' in att:
@@ -2374,11 +2374,11 @@ def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_
     # =====================================================================
     # TEST MODE LOGIC: Change "True" to "False" when ready to go live!
     # =====================================================================
-    TEST_MODE = False # <-- TURNED OFF! Emails will now go to actual attendees.
+    TEST_MODE = False # Set to True to restrict recipients to Admin only
     
     if TEST_MODE:
         print("  ⚠️ TEST MODE IS ON: Overriding recipients. Sending only to Admin.")
-        nbh_recipient_emails =[ADMIN_EMAIL_FOR_NOTIFICATIONS]
+        nbh_recipient_emails = [ADMIN_EMAIL_FOR_NOTIFICATIONS]
     # =====================================================================
 
     if not nbh_recipient_emails:
@@ -2387,7 +2387,7 @@ def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_
 
     email_subject = f"[{'TEST' if TEST_MODE else 'Pre-Meeting Brief'}]: {meeting_data['title']} with {meeting_data['brand_name']}"
     
-    # --- Build and Inject the Event ID Box with Bright Yellow styling ---
+    # 1. Event ID Box (Soft Google Yellow)
     event_id_val = meeting_data.get('id', 'N/A')
     event_id_box_html = (
         f'<div class="event-id-box">'
@@ -2395,7 +2395,7 @@ def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_
         f'</div>'
     )
 
-    # --- NEW: Build the Top 100 Sites Orange Highlight Box ---
+    # 2. Top 100 Sites Box (Orange Highlight)
     top_sites_url = "https://docs.google.com/spreadsheets/d/1NiYih9q_Gb-D6lCUjd08eDrsVAAJFqo6SRkBk8vzgrI/edit?gid=0#gid=0"
     top_sites_box_html = (
         f'<div class="top-sites-box">'
@@ -2403,15 +2403,31 @@ def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_
         f'</div>'
     )
 
-    # Stack both boxes cleanly
-    combined_boxes_html = f"{event_id_box_html}<br>{top_sites_box_html}"
+    # 3. Black & Dark Charcoal Glow Box for Pitch Deck (Rendered ONLY if PPT was generated)
+    ppt_box_html = ""
+    if ppt_deck_url:
+        ppt_box_html = f"""<br>
+        <div style="background: linear-gradient(135deg, #18191a 0%, #242526 100%); border: 1.5px solid #3a3b3c; border-radius: 8px; padding: 14px 20px; margin-top: 6px; margin-bottom: 20px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); max-width: 680px;">
+            <div style="color: #ffffff; font-size: 13.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px;">
+                🎯 CUSTOMIZED EXECUTIVE PITCH DECK
+            </div>
+            <div style="color: #e4e6eb; font-size: 13px; line-height: 1.4; margin-bottom: 10px;">
+                Auto-generated tailored pitch deck with brand assets, demographics & 360° omnichannel media:
+            </div>
+            <a href="{ppt_deck_url}" target="_blank" style="display: inline-block; background-color: #ffffff; color: #111111; font-weight: 700; font-size: 13px; padding: 7px 16px; border-radius: 5px; text-decoration: none; box-shadow: 0 2px 5px rgba(255,255,255,0.2);">
+                👉 Click Here to Open Pitch Deck (.PPTX)
+            </a>
+        </div>
+        """
 
-    # Search for the Brand Attendees line in the markdown and insert the combined HTML boxes directly beneath it
+    # Combine boxes cleanly
+    combined_boxes_html = f"{event_id_box_html}<br>{top_sites_box_html}{ppt_box_html}"
+
+    # Insert directly below Brand Attendees line
     brand_attendees_pattern = re.compile(r'(Brand Attendees\s*:.*?)(\n|$)', re.IGNORECASE)
     if brand_attendees_pattern.search(brief_content):
         modified_brief_content = brand_attendees_pattern.sub(rf'\1\n\n{combined_boxes_html}\n', brief_content)
     else:
-        # Prepend to the top of the brief as a fallback if the pattern is not found
         modified_brief_content = f"{combined_boxes_html}\n\n{brief_content}"
 
     html_brief_content = markdown.markdown(modified_brief_content)
@@ -2756,9 +2772,154 @@ def write_into_doc(docs_service, doc_id, text):
 
 
 # =====================================================================
-# PPT GENERATION HELPER FUNCTIONS REMOVED
+# AUTOMATED NBH 23-SLIDE PITCH DECK ENGINE (ISOLATED TESTING MODULE)
 # =====================================================================
-# Clean slate: PPT helper logic deleted to avoid execution during Serper testing.
+from pptx import Presentation
+from pptx.util import Inches, Pt
+from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
+from PIL import Image
+
+BRIEF_FOLDER_ID = "1rikXDq-ZyuZpUbN-ZLCsmcVJCswIlPDq"
+
+def slice_three_panel_creative(creative_image_bytes):
+    """
+    Slices the 3-panel horizontal mockup image into 3 vertical assets:
+    Panel 1 (Gate), Panel 2 (Lift), Panel 3 (PAC Mobile App).
+    """
+    if not creative_image_bytes:
+        return None, None, None
+    try:
+        img = Image.open(io.BytesIO(creative_image_bytes))
+        width, height = img.size
+        one_third = width // 3
+
+        p1 = img.crop((0, 0, one_third, height))                  # Left: Gate
+        p2 = img.crop((one_third, 0, one_third * 2, height))       # Middle: Lift
+        p3 = img.crop((one_third * 2, 0, width, height))           # Right: PAC App
+
+        p1_bytes, p2_bytes, p3_bytes = io.BytesIO(), io.BytesIO(), io.BytesIO()
+        p1.save(p1_bytes, format="JPEG", quality=95)
+        p2.save(p2_bytes, format="JPEG", quality=95)
+        p3.save(p3_bytes, format="JPEG", quality=95)
+
+        p1_bytes.seek(0)
+        p2_bytes.seek(0)
+        p3_bytes.seek(0)
+
+        return p1_bytes, p2_bytes, p3_bytes
+    except Exception as e:
+        print(f"  ⚠️ [PPT Engine] Error slicing creative image: {e}")
+        return None, None, None
+
+def generate_nbh_23_slide_deck(drive_service, brand_name, creative_image_bytes):
+    """
+    Downloads NBH_Master_Template.pptx from Drive, personalizes Slide 1 and corner headers,
+    injects the generated creative into Slides 13, 16, 17, and uploads the new deck to Drive.
+    """
+    if not drive_service:
+        return None
+    try:
+        # 1. Locate NBH_Master_Template.pptx in the Briefs folder
+        query = f"'{BRIEF_FOLDER_ID}' in parents and name = 'NBH_Master_Template.pptx' and trashed = false"
+        results = drive_service.files().list(q=query, fields="files(id, name)").execute()
+        files = results.get('files', [])
+
+        if not files:
+            print("  ⚠️ [PPT Engine] 'NBH_Master_Template.pptx' not found in Briefs folder. Skipping.")
+            return None
+
+        template_id = files[0]['id']
+        print(f"  📥 [PPT Engine] Loading Master Template (ID: {template_id})...")
+
+        # 2. Download template into memory
+        request = drive_service.files().get_media(fileId=template_id)
+        fh = io.BytesIO()
+        downloader = MediaIoBaseDownload(fh, request)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+        fh.seek(0)
+
+        prs = Presentation(fh)
+        total_slides = len(prs.slides)
+        print(f"  📊 [PPT Engine] Successfully loaded {total_slides} slides.")
+
+        # 3. Replace 'BRIDGE HEALTH' across all slides (Slide 1 + corner headers)
+        brand_clean = str(brand_name).strip()
+        for idx, slide in enumerate(prs.slides):
+            for shape in slide.shapes:
+                if shape.has_text_frame:
+                    for paragraph in shape.text_frame.paragraphs:
+                        text_raw = paragraph.text
+                        if any(k in text_raw.upper() for k in ["{{BRAND_NAME}}", "BRIDGE HEALTH", "WESTSIDE"]):
+                            for k in ["{{BRAND_NAME}}", "{{brand_name}}", "Bridge Health", "BRIDGE HEALTH", "Westside", "WESTSIDE"]:
+                                if k in paragraph.text:
+                                    paragraph.text = paragraph.text.replace(k, brand_clean.upper() if idx == 0 else brand_clean.title())
+
+        # 4. Slice the 3-panel creative
+        p1_gate, p2_lift, p3_app = slice_three_panel_creative(creative_image_bytes)
+
+        # 5. Inject Slide 13: PAC (Digital Asset)
+        if total_slides >= 13 and p3_app:
+            try:
+                slide13 = prs.slides[12]
+                slide13.shapes.add_picture(p3_app, Inches(1.0), Inches(1.8), width=Inches(3.6))
+                print("  ✅ [PPT Engine] Injected PAC Mobile Asset into Slide 13.")
+            except Exception as e_s13:
+                print(f"  ⚠️ Slide 13 image placement notice: {e_s13}")
+
+        # 6. Inject Slide 16: Gate Branding (On-Ground)
+        if total_slides >= 16 and p1_gate:
+            try:
+                slide16 = prs.slides[15]
+                slide16.shapes.add_picture(p1_gate, Inches(1.0), Inches(2.0), width=Inches(3.6))
+                print("  ✅ [PPT Engine] Injected Gate Branding Asset into Slide 16.")
+            except Exception as e_s16:
+                print(f"  ⚠️ Slide 16 image placement notice: {e_s16}")
+
+        # 7. Inject Slide 17: Lift Branding (On-Ground)
+        if total_slides >= 17 and p2_lift:
+            try:
+                slide17 = prs.slides[16]
+                slide17.shapes.add_picture(p2_lift, Inches(1.0), Inches(2.0), width=Inches(3.6))
+                print("  ✅ [PPT Engine] Injected Lift Branding Asset into Slide 17.")
+            except Exception as e_s17:
+                print(f"  ⚠️ Slide 17 image placement notice: {e_s17}")
+
+        # 8. Save customized presentation to memory
+        output_stream = io.BytesIO()
+        prs.save(output_stream)
+        output_stream.seek(0)
+
+        # 9. Upload new presentation to Drive
+        file_metadata = {
+            'name': f"Pitch Deck - {brand_clean} x NoBrokerHood.pptx",
+            'mimeType': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'parents': [BRIEF_FOLDER_ID]
+        }
+        media = MediaIoBaseUpload(
+            output_stream,
+            mimetype='application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            resumable=True
+        )
+        new_file = drive_service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
+
+        # Set permission: Anyone with link can view
+        try:
+            drive_service.permissions().create(
+                fileId=new_file.get('id'),
+                body={'type': 'anyone', 'role': 'viewer'}
+            ).execute()
+        except Exception:
+            pass
+
+        deck_url = new_file.get('webViewLink')
+        print(f"  📊 [PPT Engine] Pitch Deck ready: {deck_url}")
+        return deck_url
+
+    except Exception as e:
+        print(f"  ❌ [PPT Engine] Error creating deck: {e}")
+        return None
 
 
 def get_sheet_owner_from_email(email):
@@ -3134,6 +3295,25 @@ def main():
             except Exception as e:
                 print(f"  Warning: Failed to generate creative image: {e}")
 
+        # Step 8b: CONDITIONAL 23-SLIDE PITCH DECK (Triggered ONLY if 'testing' is in title)
+        ppt_deck_url = None
+        meeting_title_lower = meeting_data.get('title', '').lower()
+
+        # Strict isolation check: runs ONLY if "testing" is in the meeting title
+        if "testing" in meeting_title_lower:
+            print(f"  🧪 [TESTING DETECTED] Generating 23-Slide Deck for '{meeting_data['title']}'...")
+            try:
+                ppt_deck_url = generate_nbh_23_slide_deck(
+                    drive_service=drive_service,
+                    brand_name=meeting_data['brand_name'],
+                    creative_image_bytes=creative_image_bytes
+                )
+            except Exception as ppt_err:
+                print(f"  ⚠️ [PPT Engine Notice] Non-fatal error during deck generation: {ppt_err}")
+                ppt_deck_url = None
+        else:
+            print(f"  ⏭️ Skipping PPT generation: '{meeting_data['title']}' is a standard meeting.")
+
         # Feedback footer injection
         FEEDBACK_FORM_URL = "https://forms.gle/Ho9XLKsuGYhWBrBw7"
         feedback_footer = f"""\n\n
@@ -3150,9 +3330,9 @@ def main():
             print(f"  Failed to generate brief for '{meeting_data['title']}': {generated_brief}")
             continue
 
-        # Step 9: Send Email Brief to Attendees
+        # Step 9: Send Email Brief to Attendees (Includes customized PPT URL if generated)
         print(f"  Successfully generated brief for '{meeting_data['title']}'.")
-        send_brief_email(gmail_service, meeting_data, generated_brief, creative_image_bytes)
+        send_brief_email(gmail_service, meeting_data, generated_brief, creative_image_bytes, ppt_deck_url=ppt_deck_url)
         
         tag_event_as_processed(calendar_service, event_id) 
         set_one_hour_email_reminder(calendar_service, event_id) 
