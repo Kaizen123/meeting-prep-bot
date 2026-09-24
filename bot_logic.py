@@ -2403,25 +2403,20 @@ def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_
         f'</div>'
     )
 
-    # 3. Black & Dark Charcoal Glow Box for Pitch Deck (Rendered ONLY if PPT was generated)
+    # 3. Yellow Pitch Deck Box (Exact Match to Event ID Box Style)
     ppt_box_html = ""
     if ppt_deck_url:
-        ppt_box_html = f"""<br>
-        <div style="background: linear-gradient(135deg, #18191a 0%, #242526 100%); border: 1.5px solid #3a3b3c; border-radius: 8px; padding: 14px 20px; margin-top: 6px; margin-bottom: 20px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); max-width: 680px;">
-            <div style="color: #ffffff; font-size: 13.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px;">
-                🎯 CUSTOMIZED EXECUTIVE PITCH DECK
-            </div>
-            <div style="color: #e4e6eb; font-size: 13px; line-height: 1.4; margin-bottom: 10px;">
-                Auto-generated tailored pitch deck with brand assets, demographics & 360° omnichannel media:
-            </div>
-            <a href="{ppt_deck_url}" target="_blank" style="display: inline-block; background-color: #ffffff; color: #111111; font-weight: 700; font-size: 13px; padding: 7px 16px; border-radius: 5px; text-decoration: none; box-shadow: 0 2px 5px rgba(255,255,255,0.2);">
-                👉 Click Here to Open Pitch Deck (.PPTX)
-            </a>
-        </div>
-        """
+        ppt_box_html = (
+            f'<div class="event-id-box" style="margin-top: 5px; margin-bottom: 20px; border-color: #fbbc04; background-color: #fef7e0; display: block; max-width: 650px;">'
+            f'🎯 Customized Executive Pitch Deck: '
+            f'<a href="{ppt_deck_url}" target="_blank" class="top-sites-link" style="color: #1a73e8; font-weight: bold; text-decoration: underline; margin-left: 5px;">'
+            f'Click Here to Open Pitch Deck (.PPTX)'
+            f'</a>'
+            f'</div>'
+        )
 
-    # Combine boxes cleanly
-    combined_boxes_html = f"{event_id_box_html}<br>{top_sites_box_html}{ppt_box_html}"
+    # Stack all three boxes cleanly in unified theme
+    combined_boxes_html = f"{event_id_box_html}<br>{top_sites_box_html}<br>{ppt_box_html}" if ppt_deck_url else f"{event_id_box_html}<br>{top_sites_box_html}"
 
     # Insert directly below Brand Attendees line
     brand_attendees_pattern = re.compile(r'(Brand Attendees\s*:.*?)(\n|$)', re.IGNORECASE)
@@ -2772,19 +2767,23 @@ def write_into_doc(docs_service, doc_id, text):
 
 
 # =====================================================================
-# AUTOMATED NBH 23-SLIDE PITCH DECK ENGINE (ISOLATED TESTING MODULE)
+# AUTOMATED NBH 22-SLIDE PITCH DECK ENGINE (CLEAN SHAPE INJECTION V3)
 # =====================================================================
 from pptx import Presentation
 from pptx.util import Inches, Pt
+from pptx.dml.color import RGBColor
+from pptx.enum.text import PP_ALIGN
 from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 from PIL import Image
 
-BRIEF_FOLDER_ID = "1rikXDq-ZyuZpUbN-ZLCsmcVJCswIlPDq"
+BRIEF_FOLDER_ID = "1rikXDq-ZyuZpUbN-ZLCsmcVJCswllPDq"
 
-def slice_three_panel_creative(creative_image_bytes):
+def slice_three_panel_creative_clean(creative_image_bytes):
     """
-    Slices the 3-panel horizontal mockup image into 3 vertical assets:
-    Panel 1 (Gate), Panel 2 (Lift), Panel 3 (PAC Mobile App).
+    Slices the 3-panel creative image, cleanly removing:
+    - The top white header banner ("From Visibility to Conversion...")
+    - The bottom dark caption strip ("When residents enter...")
+    Returns clean image streams for: Panel 1 (Gate), Panel 2 (Lift), Panel 3 (PAC Mobile App).
     """
     if not creative_image_bytes:
         return None, None, None
@@ -2793,9 +2792,13 @@ def slice_three_panel_creative(creative_image_bytes):
         width, height = img.size
         one_third = width // 3
 
-        p1 = img.crop((0, 0, one_third, height))                  # Left: Gate
-        p2 = img.crop((one_third, 0, one_third * 2, height))       # Middle: Lift
-        p3 = img.crop((one_third * 2, 0, width, height))           # Right: PAC App
+        # Precise crop margins to eliminate header text and bottom caption bar
+        top_crop = int(height * 0.14)      # Trims top header banner
+        bottom_crop = int(height * 0.90)   # Trims bottom caption strip
+
+        p1 = img.crop((0, top_crop, one_third, bottom_crop))                  # Clean Gate
+        p2 = img.crop((one_third, top_crop, one_third * 2, bottom_crop))       # Clean Lift
+        p3 = img.crop((one_third * 2, top_crop, width, bottom_crop))           # Clean Mobile App
 
         p1_bytes, p2_bytes, p3_bytes = io.BytesIO(), io.BytesIO(), io.BytesIO()
         p1.save(p1_bytes, format="JPEG", quality=95)
@@ -2808,30 +2811,197 @@ def slice_three_panel_creative(creative_image_bytes):
 
         return p1_bytes, p2_bytes, p3_bytes
     except Exception as e:
-        print(f"  ⚠️ [PPT Engine] Error slicing creative image: {e}")
+        print(f"  ⚠️ [PPT Engine] Error cleanly slicing creative: {e}")
         return None, None, None
 
-def generate_nbh_23_slide_deck(drive_service, brand_name, creative_image_bytes):
+def generate_slide_11_content_with_gemini(gemini_client, brand_name, industry):
     """
-    Downloads NBH_Master_Template.pptx from Drive, personalizes Slide 1 and corner headers,
-    injects the generated creative into Slides 13, 16, 17, and uploads the new deck to Drive.
+    Synthesizes brand-specific campaign objectives and target audience for Slide 11 using Gemini.
+    """
+    if not gemini_client:
+        return None
+    prompt = f"""
+    You are an expert media planner at NoBrokerHood creating Slide 11 ('HOW CAN WE HELP?') for a pitch deck to '{brand_name}' (Industry: {industry}).
+    Return ONLY a valid JSON object with:
+    1. 'objectives': A list of 4 concise bullet points for their campaign objectives (under 12 words each).
+    2. 'target_audience': A list of 3 concise bullet points defining the target gated community demographic (under 10 words each).
+
+    Example JSON:
+    {{
+      "objectives": [
+        "Drive local patient footfall and consultations at nearby hospital facilities",
+        "Promote comprehensive preventive health checkup packages to families",
+        "Build medical authority through resident screening camps and doctor sessions",
+        "Generate high-intent digital leads for specialist appointment bookings"
+      ],
+      "target_audience": [
+        "Families with elderly parents needing regular health monitoring",
+        "Working professionals seeking quick diagnostic and clinic access",
+        "Health-conscious residents living in premium gated communities"
+      ]
+    }}
+    """
+    try:
+        config = types.GenerateContentConfig(temperature=0.2, response_mime_type="application/json")
+        res = gemini_client.models.generate_content(model="gemini-2.5-flash", contents=prompt, config=config)
+        return json.loads(res.text.strip())
+    except Exception as e:
+        print(f"  ⚠️ [PPT Engine] Slide 11 generation fallback: {e}")
+        return None
+
+def generate_island_banner_image(gemini_client, brand_name, visual_context):
+    """
+    Generates a dedicated in-app Island Banner creative for Slide 14.
+    """
+    if not gemini_client or not visual_context:
+        return None
+    colors = visual_context.get("primary_colors", "brand colors")
+    visual_scene = visual_context.get("visual_scene", "modern lifestyle product")
+    short_slogan = visual_context.get("short_slogan", "Exclusive Resident Offer")
+
+    prompt = f"""
+    Create a clean, commercial mobile app UI mockup for NoBrokerHood (a premium gated society management app).
+    The phone screen displays the dark-themed NoBrokerHood resident community feed.
+    In the center of the feed is a prominent, clean horizontal 'ISLAND BANNER' ad placement for '{brand_name}'.
+    The Island Banner displays '{brand_name}' logo, brand colors ({colors}), clean typography with slogan '{short_slogan}', and visual scene: '{visual_scene}'.
+    Below the banner are native app navigation icons ('Community', 'Services', 'Marketplace').
+    Aesthetic: Modern, photorealistic, premium editorial finish with zero text distortion.
+    """
+    try:
+        res = gemini_client.models.generate_content(
+            model="gemini-3-pro-image-preview",
+            contents=prompt,
+            config=types.GenerateContentConfig(response_modalities=["IMAGE", "TEXT"])
+        )
+        if res.candidates:
+            for part in res.candidates[0].content.parts:
+                if part.inline_data and part.inline_data.mime_type.startswith("image/"):
+                    raw = part.inline_data.data
+                    if isinstance(raw, str):
+                        raw = base64.b64decode(raw)
+                    return io.BytesIO(raw)
+    except Exception as e:
+        print(f"  ⚠️ [PPT Engine] Island banner image generation notice: {e}")
+    return None
+
+def generate_pamphlet_sampling_image(gemini_client, brand_name, visual_context):
+    """
+    Generates a dedicated door-to-door pamphlet/sampling mockup for Slide 17.
+    """
+    if not gemini_client or not visual_context:
+        return None
+    colors = visual_context.get("primary_colors", "brand colors")
+    visual_scene = visual_context.get("visual_scene", "premium product packaging")
+    short_slogan = visual_context.get("short_slogan", "Special Community Offer")
+
+    prompt = f"""
+    Create a photorealistic, studio-lit commercial product photography shot of an open, premium 3-fold marketing brochure / door-to-door resident pamphlet for '{brand_name}'.
+    The brochure is resting elegantly on a modern wooden entryway table next to an apartment door key.
+    The pamphlet cover clearly features '{brand_name}' branding, primary brand colors ({colors}), clean headline typography '{short_slogan}', and product imagery '{visual_scene}'.
+    The inside fold reveals clear bullet points with exclusive gated community resident offers and a scannable QR code card.
+    Lighting: Soft ambient morning daylight, crisp focus, commercial agency print mockup aesthetic.
+    """
+    try:
+        res = gemini_client.models.generate_content(
+            model="gemini-3-pro-image-preview",
+            contents=prompt,
+            config=types.GenerateContentConfig(response_modalities=["IMAGE", "TEXT"])
+        )
+        if res.candidates:
+            for part in res.candidates[0].content.parts:
+                if part.inline_data and part.inline_data.mime_type.startswith("image/"):
+                    raw = part.inline_data.data
+                    if isinstance(raw, str):
+                        raw = base64.b64decode(raw)
+                    return io.BytesIO(raw)
+    except Exception as e:
+        print(f"  ⚠️ [PPT Engine] Pamphlet image generation notice: {e}")
+    return None
+
+def place_image_into_matching_box(slide, image_stream, target_box_index=0):
+    """
+    Smart detector: Looks for both Picture shapes (type 13) and Blank Outline Rectangle shapes (type 1).
+    Captures exact dimensions and places the image into the frame.
+    """
+    if not image_stream:
+        return
+
+    candidate_shapes = []
+    for s in slide.shapes:
+        # Check for pictures OR rectangular shapes located in the content area (not corner logo or header text)
+        if s.shape_type in [1, 13] and s.top > Inches(1.2) and s.left < Inches(9.0):
+            candidate_shapes.append(s)
+
+    # Sort left-to-right so shape 0 is Left and shape 1 is Right
+    candidate_shapes.sort(key=lambda s: s.left)
+
+    if candidate_shapes and len(candidate_shapes) > target_box_index:
+        target = candidate_shapes[target_box_index]
+        left, top, width, height = target.left, target.top, target.width, target.height
+
+        # Remove placeholder box
+        sp = target._element
+        sp.getparent().remove(sp)
+
+        # Drop clean image into exact coordinates
+        slide.shapes.add_picture(image_stream, left, top, width=width, height=height)
+
+def update_brand_name_and_badges(slide, brand_name, is_slide_1=False):
+    """
+    Replaces brand text in text frames AND writes the brand name cleanly
+    into the top-left white blank box on every slide.
+    """
+    brand_display = brand_name.upper() if is_slide_1 else brand_name.title()
+
+    # 1. Standard text frame replacement
+    for shape in slide.shapes:
+        if shape.has_text_frame:
+            for p in shape.text_frame.paragraphs:
+                for k in ["BRIDGE HEALTH", "Bridge Health", "{{BRAND_NAME}}", "WESTSIDE", "Westside"]:
+                    if k in p.text:
+                        p.text = p.text.replace(k, brand_display)
+
+    # 2. Write brand name into the top-left white box
+    if not is_slide_1:
+        corner_box = slide.shapes.add_textbox(Inches(0.4), Inches(0.45), Inches(2.2), Inches(0.55))
+        tf = corner_box.text_frame
+        tf.word_wrap = True
+        p = tf.paragraphs[0]
+        p.text = brand_display
+        p.font.bold = True
+        p.font.size = Pt(13)
+        p.font.color.rgb = RGBColor(26, 32, 44)
+        p.alignment = PP_ALIGN.LEFT
+    else:
+        # On Slide 1: Write brand name directly inside the white box next to 'X'
+        cover_box = slide.shapes.add_textbox(Inches(6.8), Inches(4.3), Inches(3.2), Inches(0.8))
+        tf1 = cover_box.text_frame
+        p1 = tf1.paragraphs[0]
+        p1.text = brand_display
+        p1.font.bold = True
+        p1.font.size = Pt(22)
+        p1.font.color.rgb = RGBColor(26, 32, 44)
+        p1.alignment = PP_ALIGN.CENTER
+
+def generate_nbh_22_slide_deck(drive_service, gemini_client, brand_name, industry, creative_image_bytes, visual_context=None):
+    """
+    Customizes the 22-slide NBH Master Deck with pixel-perfect asset injection.
     """
     if not drive_service:
         return None
     try:
-        # 1. Locate NBH_Master_Template.pptx in the Briefs folder
+        # Locate NBH_Master_Template.pptx in the Briefs folder
         query = f"'{BRIEF_FOLDER_ID}' in parents and name = 'NBH_Master_Template.pptx' and trashed = false"
         results = drive_service.files().list(q=query, fields="files(id, name)").execute()
         files = results.get('files', [])
 
         if not files:
-            print("  ⚠️ [PPT Engine] 'NBH_Master_Template.pptx' not found in Briefs folder. Skipping.")
+            print("  ⚠️ [PPT Engine] 'NBH_Master_Template.pptx' not found in Briefs folder.")
             return None
 
         template_id = files[0]['id']
         print(f"  📥 [PPT Engine] Loading Master Template (ID: {template_id})...")
 
-        # 2. Download template into memory
         request = drive_service.files().get_media(fileId=template_id)
         fh = io.BytesIO()
         downloader = MediaIoBaseDownload(fh, request)
@@ -2842,58 +3012,93 @@ def generate_nbh_23_slide_deck(drive_service, brand_name, creative_image_bytes):
 
         prs = Presentation(fh)
         total_slides = len(prs.slides)
-        print(f"  📊 [PPT Engine] Successfully loaded {total_slides} slides.")
+        print(f"  📊 [PPT Engine] Loaded presentation with {total_slides} slides.")
 
-        # 3. Replace 'BRIDGE HEALTH' across all slides (Slide 1 + corner headers)
-        brand_clean = str(brand_name).strip()
+        # Slice creative images without headers/footers
+        p1_gate, p2_lift, p3_app = slice_three_panel_creative_clean(creative_image_bytes)
+
+        # Generate targeted Island Banner & Pamphlet assets
+        print("  🎨 [PPT Engine] Generating dedicated Island Banner & Pamphlet sampling mockups...")
+        island_banner_stream = generate_island_banner_image(gemini_client, brand_name, visual_context)
+        pamphlet_stream = generate_pamphlet_sampling_image(gemini_client, brand_name, visual_context)
+
+        # Iterate through slides to update branding, text, and images
         for idx, slide in enumerate(prs.slides):
-            for shape in slide.shapes:
-                if shape.has_text_frame:
-                    for paragraph in shape.text_frame.paragraphs:
-                        text_raw = paragraph.text
-                        if any(k in text_raw.upper() for k in ["{{BRAND_NAME}}", "BRIDGE HEALTH", "WESTSIDE"]):
-                            for k in ["{{BRAND_NAME}}", "{{brand_name}}", "Bridge Health", "BRIDGE HEALTH", "Westside", "WESTSIDE"]:
-                                if k in paragraph.text:
-                                    paragraph.text = paragraph.text.replace(k, brand_clean.upper() if idx == 0 else brand_clean.title())
+            slide_num = idx + 1
+            is_slide_1 = (slide_num == 1)
 
-        # 4. Slice the 3-panel creative
-        p1_gate, p2_lift, p3_app = slice_three_panel_creative(creative_image_bytes)
+            # Update brand text and write into corner white boxes
+            update_brand_name_and_badges(slide, brand_name, is_slide_1=is_slide_1)
 
-        # 5. Inject Slide 13: PAC (Digital Asset)
-        if total_slides >= 13 and p3_app:
-            try:
-                slide13 = prs.slides[12]
-                slide13.shapes.add_picture(p3_app, Inches(1.0), Inches(1.8), width=Inches(3.6))
-                print("  ✅ [PPT Engine] Injected PAC Mobile Asset into Slide 13.")
-            except Exception as e_s13:
-                print(f"  ⚠️ Slide 13 image placement notice: {e_s13}")
+            # Slide 11: HOW CAN WE HELP? (Campaign Objectives & Target Audience)
+            if slide_num == 11:
+                content_data = generate_slide_11_content_with_gemini(gemini_client, brand_name, industry)
+                if content_data:
+                    for shape in slide.shapes:
+                        if shape.has_text_frame and "primary objective" in shape.text_frame.text.lower():
+                            tf = shape.text_frame
+                            tf.clear()
 
-        # 6. Inject Slide 16: Gate Branding (On-Ground)
-        if total_slides >= 16 and p1_gate:
-            try:
-                slide16 = prs.slides[15]
-                slide16.shapes.add_picture(p1_gate, Inches(1.0), Inches(2.0), width=Inches(3.6))
-                print("  ✅ [PPT Engine] Injected Gate Branding Asset into Slide 16.")
-            except Exception as e_s16:
-                print(f"  ⚠️ Slide 16 image placement notice: {e_s16}")
+                            p_h1 = tf.paragraphs[0]
+                            p_h1.text = "The primary objective of the campaign:"
+                            p_h1.font.bold = True
+                            p_h1.font.size = Pt(14)
+                            p_h1.font.color.rgb = RGBColor(26, 32, 44)
 
-        # 7. Inject Slide 17: Lift Branding (On-Ground)
-        if total_slides >= 17 and p2_lift:
-            try:
-                slide17 = prs.slides[16]
-                slide17.shapes.add_picture(p2_lift, Inches(1.0), Inches(2.0), width=Inches(3.6))
-                print("  ✅ [PPT Engine] Injected Lift Branding Asset into Slide 17.")
-            except Exception as e_s17:
-                print(f"  ⚠️ Slide 17 image placement notice: {e_s17}")
+                            for obj in content_data.get("objectives", []):
+                                p_obj = tf.add_paragraph()
+                                p_obj.text = f"• {obj}"
+                                p_obj.font.size = Pt(12)
+                                p_obj.font.color.rgb = RGBColor(74, 85, 104)
 
-        # 8. Save customized presentation to memory
+                            p_h2 = tf.add_paragraph()
+                            p_h2.text = "\nTARGET AUDIENCE"
+                            p_h2.font.bold = True
+                            p_h2.font.size = Pt(13)
+                            p_h2.font.color.rgb = RGBColor(234, 67, 53) # NBH Red
+
+                            for aud in content_data.get("target_audience", []):
+                                p_aud = tf.add_paragraph()
+                                p_aud.text = f"• {aud}"
+                                p_aud.font.size = Pt(12)
+                                p_aud.font.color.rgb = RGBColor(74, 85, 104)
+                    print("  ✅ [PPT Engine] Slide 11: Objectives & Audience dynamically updated.")
+
+            # Slide 13: PAC (Digital Asset)
+            elif slide_num == 13 and p3_app:
+                place_image_into_matching_box(slide, p3_app, target_box_index=0)
+                print("  ✅ [PPT Engine] Slide 13: Clean Mobile PAC Asset injected.")
+
+            # Slide 14: Island Banner (Digital Asset)
+            elif slide_num == 14:
+                target_island = island_banner_stream if island_banner_stream else p3_app
+                if target_island:
+                    target_island.seek(0)
+                    place_image_into_matching_box(slide, target_island, target_box_index=0)
+                    print("  ✅ [PPT Engine] Slide 14: Dedicated Island Banner Asset injected.")
+
+            # Slide 16: Gate & Lift Branding (On-Ground)
+            elif slide_num == 16:
+                if p1_gate:
+                    place_image_into_matching_box(slide, p1_gate, target_box_index=0) # Left: Gate
+                if p2_lift:
+                    place_image_into_matching_box(slide, p2_lift, target_box_index=1) # Right: Lift
+                print("  ✅ [PPT Engine] Slide 16: Clean Gate & Lift Assets placed side-by-side.")
+
+            # Slide 17: Pamphlet Distribution
+            elif slide_num == 17 and pamphlet_stream:
+                pamphlet_stream.seek(0)
+                place_image_into_matching_box(slide, pamphlet_stream, target_box_index=0)
+                print("  ✅ [PPT Engine] Slide 17: Dedicated Pamphlet sampling mockup injected.")
+
+        # Save customized presentation to memory
         output_stream = io.BytesIO()
         prs.save(output_stream)
         output_stream.seek(0)
 
-        # 9. Upload new presentation to Drive
+        # Upload new customized presentation to Drive
         file_metadata = {
-            'name': f"Pitch Deck - {brand_clean} x NoBrokerHood.pptx",
+            'name': f"Pitch Deck - {brand_name} x NoBrokerHood.pptx",
             'mimeType': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
             'parents': [BRIEF_FOLDER_ID]
         }
@@ -2904,17 +3109,13 @@ def generate_nbh_23_slide_deck(drive_service, brand_name, creative_image_bytes):
         )
         new_file = drive_service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
 
-        # Set permission: Anyone with link can view
         try:
-            drive_service.permissions().create(
-                fileId=new_file.get('id'),
-                body={'type': 'anyone', 'role': 'viewer'}
-            ).execute()
+            drive_service.permissions().create(fileId=new_file.get('id'), body={'type': 'anyone', 'role': 'viewer'}).execute()
         except Exception:
             pass
 
         deck_url = new_file.get('webViewLink')
-        print(f"  📊 [PPT Engine] Pitch Deck ready: {deck_url}")
+        print(f"  📊 [PPT Engine] Pitch Deck generated: {deck_url}")
         return deck_url
 
     except Exception as e:
@@ -3295,18 +3496,21 @@ def main():
             except Exception as e:
                 print(f"  Warning: Failed to generate creative image: {e}")
 
-        # Step 8b: CONDITIONAL 23-SLIDE PITCH DECK (Triggered ONLY if 'testing' is in title)
+        # Step 8b: CONDITIONAL 22-SLIDE PITCH DECK (Triggered ONLY if 'testing' is in title)
         ppt_deck_url = None
         meeting_title_lower = meeting_data.get('title', '').lower()
 
         # Strict isolation check: runs ONLY if "testing" is in the meeting title
         if "testing" in meeting_title_lower:
-            print(f"  🧪 [TESTING DETECTED] Generating 23-Slide Deck for '{meeting_data['title']}'...")
+            print(f"  🧪 [TESTING DETECTED] Generating 22-Slide Deck for '{meeting_data['title']}'...")
             try:
-                ppt_deck_url = generate_nbh_23_slide_deck(
+                ppt_deck_url = generate_nbh_22_slide_deck(
                     drive_service=drive_service,
+                    gemini_client=gemini_llm_client,
                     brand_name=meeting_data['brand_name'],
-                    creative_image_bytes=creative_image_bytes
+                    industry=meeting_data['industry'],
+                    creative_image_bytes=creative_image_bytes,
+                    visual_context=visual_context
                 )
             except Exception as ppt_err:
                 print(f"  ⚠️ [PPT Engine Notice] Non-fatal error during deck generation: {ppt_err}")
