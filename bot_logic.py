@@ -2770,7 +2770,7 @@ def write_into_doc(docs_service, doc_id, text):
 
 
 # =====================================================================
-# AUTOMATED NBH 22-SLIDE PITCH DECK ENGINE (SUB-2-SECOND RUNTIME)
+# AUTOMATED NBH PITCH DECK ENGINE (WESTSIDE-STYLE SLIDE 1 + ACCURATE MEDIA)
 # =====================================================================
 from pptx import Presentation
 from pptx.util import Inches, Pt
@@ -2781,7 +2781,7 @@ from PIL import Image
 
 def slice_three_panel_creative_clean(creative_image_bytes):
     """
-    Slices the 3-panel creative image, strictly stripping off:
+    Slices the 3-panel creative image, cleanly removing:
     - The top white header banner ("From Visibility to Conversion...")
     - The bottom dark caption strip ("When residents enter...")
     Returns clean image streams for: Panel 1 (Gate), Panel 2 (Lift), Panel 3 (PAC Mobile App).
@@ -2793,9 +2793,9 @@ def slice_three_panel_creative_clean(creative_image_bytes):
         width, height = img.size
         one_third = width // 3
 
-        # Precise crop margins to eliminate header text and bottom caption bar
+        # Crop margins to eliminate header text and bottom caption bar
         top_crop = int(height * 0.14)      # Trims top header banner
-        bottom_crop = int(height * 0.90)   # Trims bottom caption strip
+        bottom_crop = int(height * 0.89)   # Trims bottom caption strip
 
         p1 = img.crop((0, top_crop, one_third, bottom_crop))                  # Clean Gate
         p2 = img.crop((one_third, top_crop, one_third * 2, bottom_crop))       # Clean Lift
@@ -2817,12 +2817,12 @@ def slice_three_panel_creative_clean(creative_image_bytes):
 
 def generate_slide_11_content_with_gemini(gemini_client, brand_name, industry):
     """
-    Synthesizes brand-specific campaign objectives and target audience for Slide 11 using Gemini (takes ~1.2s).
+    Synthesizes brand-specific campaign objectives and target audience for Slide 11 using Gemini (~1.2s).
     """
     if not gemini_client:
         return None
     prompt = f"""
-    You are a media planner at NoBrokerHood creating Slide 11 ('HOW CAN WE HELP?') for a pitch deck to '{brand_name}' (Industry: {industry}).
+    You are an expert media planner at NoBrokerHood creating Slide 11 ('HOW CAN WE HELP?') for a pitch deck to '{brand_name}' (Industry: {industry}).
     Return ONLY a valid JSON object with:
     1. 'objectives': A list of 4 concise bullet points for their campaign objectives (under 12 words each).
     2. 'target_audience': A list of 3 concise bullet points defining the target gated community demographic (under 10 words each).
@@ -2830,15 +2830,15 @@ def generate_slide_11_content_with_gemini(gemini_client, brand_name, industry):
     Example JSON:
     {{
       "objectives": [
-        "Drive local customer footfall and inquiries at nearby retail outlets",
-        "Promote premium product offerings and trial registrations to verified residents",
-        "Build brand trust through on-ground resident activations and canopy setups",
-        "Generate high-intent digital leads for online orders and app signups"
+        "Drive local customer footfall and inquiries at nearby stores/outlets",
+        "Promote premium offerings and trial orders directly to verified residents",
+        "Build brand trust through on-ground resident activations and booth setups",
+        "Generate high-intent digital leads for online orders and app downloads"
       ],
       "target_audience": [
         "High-disposable-income families living in premium gated societies",
-        "Working professionals seeking convenience and quality doorstep services",
-        "Active digital shoppers looking for exclusive community promotions"
+        "Working professionals seeking convenience and fast doorstep delivery",
+        "Active digital households looking for exclusive community promotions"
       ]
     }}
     """
@@ -2850,42 +2850,52 @@ def generate_slide_11_content_with_gemini(gemini_client, brand_name, industry):
         print(f"  ⚠️ [PPT Engine] Slide 11 generation fallback: {e}")
         return None
 
-def place_image_into_matching_box(slide, image_stream, target_box_index=0):
+def apply_westside_brand_title(slide, brand_name):
     """
-    Smart detector: Looks for both Picture shapes (type 13) and Blank Outline Rectangle shapes (type 1).
-    Captures exact dimensions and places the image into the frame.
+    Renders the brand name on Slide 1 in the exact 'Westside' style:
+    - Pure white typography (#FFFFFF)
+    - 38pt bold font
+    - Transparent background (no white box)
+    - Positioned directly after 'NOBROKER HOOD X'
     """
-    if not image_stream:
-        return
+    brand_display = brand_name.upper().strip()
 
-    candidate_shapes = []
-    for s in slide.shapes:
-        # Check for pictures OR rectangular shapes located in the content area (not corner logo or header text)
-        if s.shape_type in [1, 13] and s.top > Inches(1.2) and s.left < Inches(9.0):
-            candidate_shapes.append(s)
+    # Remove any old white box placeholders that might exist on Slide 1
+    shapes_to_remove = []
+    for shape in slide.shapes:
+        if shape.has_text_frame:
+            text_u = shape.text_frame.text.upper()
+            if any(k in text_u for k in ["BRIDGE HEALTH", "WESTSIDE", "BLINKIT", "{{BRAND_NAME}}"]):
+                shapes_to_remove.append(shape)
+        # If it's a white placeholder box placed next to X
+        elif shape.shape_type == 1 and shape.left > Inches(6.0) and shape.top > Inches(3.5):
+            shapes_to_remove.append(shape)
 
-    # Sort left-to-right so shape 0 is Left and shape 1 is Right
-    candidate_shapes.sort(key=lambda s: s.left)
+    for s in shapes_to_remove:
+        try:
+            sp = s._element
+            sp.getparent().remove(sp)
+        except Exception:
+            pass
 
-    if candidate_shapes and len(candidate_shapes) > target_box_index:
-        target = candidate_shapes[target_box_index]
-        left, top, width, height = target.left, target.top, target.width, target.height
+    # Add clean, stylized white text directly to the right of 'X'
+    title_box = slide.shapes.add_textbox(Inches(6.8), Inches(4.3), Inches(5.5), Inches(1.1))
+    tf = title_box.text_frame
+    tf.word_wrap = False
+    p = tf.paragraphs[0]
+    p.text = brand_display
+    p.font.bold = True
+    p.font.size = Pt(38)
+    p.font.name = "Trebuchet MS"
+    p.font.color.rgb = RGBColor(255, 255, 255) # Pure White
+    p.alignment = PP_ALIGN.LEFT
+    print(f"  ✅ [PPT Engine] Slide 1 stylized in Westside format: '{brand_display}'")
 
-        # Remove placeholder box
-        sp = target._element
-        sp.getparent().remove(sp)
-
-        # Drop clean image into exact coordinates
-        slide.shapes.add_picture(image_stream, left, top, width=width, height=height)
-
-def update_brand_name_and_badges(slide, brand_name, is_slide_1=False):
+def update_corner_logo_text(slide, brand_name):
     """
-    Replaces brand text in text frames AND writes the brand name cleanly
-    into the top-left white blank box on every slide.
+    Updates text in the top-left corner on inner slides with the brand name.
     """
-    brand_display = brand_name.upper() if is_slide_1 else brand_name.title()
-
-    # 1. Standard text frame replacement
+    brand_display = brand_name.title().strip()
     for shape in slide.shapes:
         if shape.has_text_frame:
             for p in shape.text_frame.paragraphs:
@@ -2893,43 +2903,93 @@ def update_brand_name_and_badges(slide, brand_name, is_slide_1=False):
                     if k in p.text:
                         p.text = p.text.replace(k, brand_display)
 
-    # 2. Write brand name into the top-left white box
-    if not is_slide_1:
-        corner_box = slide.shapes.add_textbox(Inches(0.4), Inches(0.45), Inches(2.2), Inches(0.55))
-        tf = corner_box.text_frame
-        tf.word_wrap = True
-        p = tf.paragraphs[0]
-        p.text = brand_display
-        p.font.bold = True
-        p.font.size = Pt(13)
-        p.font.color.rgb = RGBColor(26, 32, 44)
-        p.alignment = PP_ALIGN.LEFT
-    else:
-        # On Slide 1: Write brand name directly inside the white box next to 'X'
-        cover_box = slide.shapes.add_textbox(Inches(6.8), Inches(4.3), Inches(3.2), Inches(0.8))
-        tf1 = cover_box.text_frame
-        p1 = tf1.paragraphs[0]
-        p1.text = brand_display
-        p1.font.bold = True
-        p1.font.size = Pt(22)
-        p1.font.color.rgb = RGBColor(26, 32, 44)
-        p1.alignment = PP_ALIGN.CENTER
+def inject_gate_and_lift_images(slide, p1_gate, p2_lift):
+    """
+    Places Gate Branding on the Left and Lift Branding on the Right with exact dimensions.
+    Removes any black outline boxes left on the slide.
+    """
+    # Remove old black outline frames
+    boxes_to_remove = []
+    for s in slide.shapes:
+        if s.shape_type in [1, 13] and s.top > Inches(1.8) and s.top < Inches(6.0):
+            boxes_to_remove.append(s)
+    for b in boxes_to_remove:
+        try:
+            sp = b._element
+            sp.getparent().remove(sp)
+        except Exception:
+            pass
+
+    # Insert clean Gate image (Left frame)
+    if p1_gate:
+        p1_gate.seek(0)
+        slide.shapes.add_picture(p1_gate, Inches(2.0), Inches(2.3), width=Inches(3.8), height=Inches(3.3))
+        print("  ✅ [PPT Engine] Gate Branding image injected successfully.")
+
+    # Insert clean Lift image (Right frame)
+    if p2_lift:
+        p2_lift.seek(0)
+        slide.shapes.add_picture(p2_lift, Inches(6.2), Inches(2.3), width=Inches(2.5), height=Inches(3.3))
+        print("  ✅ [PPT Engine] Lift Branding image injected successfully.")
+
+def inject_mobile_app_image(slide, p3_app):
+    """
+    Places clean mobile app creative inside the smartphone screen frame.
+    """
+    if not p3_app:
+        return
+    p3_app.seek(0)
+    # Remove old placeholder box inside the phone
+    boxes_to_remove = []
+    for s in slide.shapes:
+        if s.shape_type in [1, 13] and s.left > Inches(1.8) and s.left < Inches(4.5) and s.top > Inches(2.5):
+            boxes_to_remove.append(s)
+    for b in boxes_to_remove:
+        try:
+            sp = b._element
+            sp.getparent().remove(sp)
+        except Exception:
+            pass
+
+    slide.shapes.add_picture(p3_app, Inches(2.1), Inches(2.6), width=Inches(2.0), height=Inches(3.0))
+    print("  ✅ [PPT Engine] Mobile In-App Asset injected successfully.")
+
+def inject_pamphlet_image(slide, creative_bytes):
+    """
+    Places clean sampling creative onto the Pamphlet slide.
+    """
+    if not creative_bytes:
+        return
+    # Remove old placeholder box
+    boxes_to_remove = []
+    for s in slide.shapes:
+        if s.shape_type in [1, 13] and s.top > Inches(1.8) and s.top < Inches(5.5) and s.left > Inches(1.5):
+            boxes_to_remove.append(s)
+    for b in boxes_to_remove:
+        try:
+            sp = b._element
+            sp.getparent().remove(sp)
+        except Exception:
+            pass
+
+    img_stream = io.BytesIO(creative_bytes)
+    slide.shapes.add_picture(img_stream, Inches(2.2), Inches(2.2), width=Inches(7.2), height=Inches(3.5))
+    print("  ✅ [PPT Engine] Pamphlet Sampling Asset injected successfully.")
 
 def generate_nbh_22_slide_deck(drive_service, gemini_client, brand_name, industry, creative_image_bytes, visual_context=None):
     """
-    Customizes the 22-slide NBH Master Deck in under 1.8 seconds.
-    Uses in-memory image slicing to avoid multiple image generations and Cloud Run timeouts.
+    Finds the master template in Drive and customizes it in ~1.8 seconds.
     """
     if not drive_service:
         return None
     try:
-        # 1. Direct Global Search for template file (immune to folder ID typos)
+        # 1. Global search for the template in Drive
         query = "name = 'NBH_Master_Template.pptx' and trashed = false"
         results = drive_service.files().list(q=query, fields="files(id, name, parents)").execute()
         files = results.get('files', [])
 
         if not files:
-            print("  ⚠️ [PPT Engine] 'NBH_Master_Template.pptx' not found anywhere in Drive!")
+            print("  ⚠️ [PPT Engine] 'NBH_Master_Template.pptx' not found in Drive!")
             return None
 
         template_id = files[0]['id']
@@ -2945,76 +3005,83 @@ def generate_nbh_22_slide_deck(drive_service, gemini_client, brand_name, industr
         fh.seek(0)
 
         prs = Presentation(fh)
-        total_slides = len(prs.slides)
-        print(f"  📊 [PPT Engine] Loaded presentation with {total_slides} slides.")
+        print(f"  📊 [PPT Engine] Loaded presentation with {len(prs.slides)} slides.")
 
-        # 2. Slice creative in 0.01 seconds (Zero AI latency)
+        # 2. Slice creative into Gate, Lift, and App in memory (0.01 seconds)
         p1_gate, p2_lift, p3_app = slice_three_panel_creative_clean(creative_image_bytes)
 
-        # 3. Slide 11 Content (1 fast Gemini text call: ~1.2s)
+        # 3. Slide 11 Content (1 fast text call: ~1.2s)
         content_data = generate_slide_11_content_with_gemini(gemini_client, brand_name, industry)
 
-        # 4. Iterate through slides and place assets
+        # 4. Content-aware slide scanning
         for idx, slide in enumerate(prs.slides):
-            slide_num = idx + 1
-            is_slide_1 = (slide_num == 1)
+            # Gather all text on the slide to identify its section
+            slide_text = ""
+            for shape in slide.shapes:
+                if shape.has_text_frame:
+                    slide_text += " " + shape.text_frame.text.upper()
 
-            # Update brand text and write into corner white boxes
-            update_brand_name_and_badges(slide, brand_name, is_slide_1=is_slide_1)
+            # Slide 1 (Cover)
+            if idx == 0:
+                apply_westside_brand_title(slide, brand_name)
+                continue
 
-            # Slide 11: Objectives & Audience
-            if slide_num == 11 and content_data:
-                for shape in slide.shapes:
-                    if shape.has_text_frame and "primary objective" in shape.text_frame.text.lower():
-                        tf = shape.text_frame
-                        tf.clear()
+            # Inner slides: update corner branding
+            update_corner_logo_text(slide, brand_name)
 
-                        p_h1 = tf.paragraphs[0]
-                        p_h1.text = "The primary objective of the campaign:"
-                        p_h1.font.bold = True
-                        p_h1.font.size = Pt(14)
-                        p_h1.font.color.rgb = RGBColor(26, 32, 44)
+            # Slide 11: Objectives & Target Audience
+            if "HOW CAN WE HELP" in slide_text or "PRIMARY OBJECTIVE" in slide_text:
+                if content_data:
+                    for shape in slide.shapes:
+                        if shape.has_text_frame and "primary objective" in shape.text_frame.text.lower():
+                            tf = shape.text_frame
+                            tf.clear()
 
-                        for obj in content_data.get("objectives", []):
-                            p_obj = tf.add_paragraph()
-                            p_obj.text = f"• {obj}"
-                            p_obj.font.size = Pt(12)
-                            p_obj.font.color.rgb = RGBColor(74, 85, 104)
+                            p_h1 = tf.paragraphs[0]
+                            p_h1.text = "The primary objective of the campaign:"
+                            p_h1.font.bold = True
+                            p_h1.font.size = Pt(14)
+                            p_h1.font.color.rgb = RGBColor(26, 32, 44)
 
-                        p_h2 = tf.add_paragraph()
-                        p_h2.text = "\nTARGET AUDIENCE"
-                        p_h2.font.bold = True
-                        p_h2.font.size = Pt(13)
-                        p_h2.font.color.rgb = RGBColor(234, 67, 53) # NBH Red
+                            for obj in content_data.get("objectives", []):
+                                p_obj = tf.add_paragraph()
+                                p_obj.text = f"• {obj}"
+                                p_obj.font.size = Pt(12)
+                                p_obj.font.color.rgb = RGBColor(74, 85, 104)
 
-                        for aud in content_data.get("target_audience", []):
-                            p_aud = tf.add_paragraph()
-                            p_aud.text = f"• {aud}"
-                            p_aud.font.size = Pt(12)
-                            p_aud.font.color.rgb = RGBColor(74, 85, 104)
+                            p_h2 = tf.add_paragraph()
+                            p_h2.text = "\nTARGET AUDIENCE"
+                            p_h2.font.bold = True
+                            p_h2.font.size = Pt(13)
+                            p_h2.font.color.rgb = RGBColor(234, 67, 53) # NBH Red
 
-            # Slide 13: PAC (Digital Asset)
-            elif slide_num == 13 and p3_app:
-                place_image_into_matching_box(slide, p3_app, target_box_index=0)
+                            for aud in content_data.get("target_audience", []):
+                                p_aud = tf.add_paragraph()
+                                p_aud.text = f"• {aud}"
+                                p_aud.font.size = Pt(12)
+                                p_aud.font.color.rgb = RGBColor(74, 85, 104)
+                    print("  ✅ [PPT Engine] Slide 11: Objectives & Audience updated.")
 
-            # Slide 14: Island Banner (Digital Asset)
-            elif slide_num == 14 and p3_app:
-                p3_app.seek(0)
-                place_image_into_matching_box(slide, p3_app, target_box_index=0)
+            # Digital Assets: PAC & Island Banner
+            elif "POST APPROVAL CARD" in slide_text or "PAC" in slide_text:
+                inject_mobile_app_image(slide, p3_app)
+            elif "ISLAND BANNER" in slide_text:
+                inject_mobile_app_image(slide, p3_app)
 
-            # Slide 16: Gate & Lift Branding (On-Ground)
-            elif slide_num == 16:
-                if p1_gate:
-                    place_image_into_matching_box(slide, p1_gate, target_box_index=0) # Left: Gate
-                if p2_lift:
-                    place_image_into_matching_box(slide, p2_lift, target_box_index=1) # Right: Lift
+            # On-Ground Assets: Gate & Lift
+            elif "GATE BRANDING" in slide_text or "LIFT BRANDING" in slide_text:
+                inject_gate_and_lift_images(slide, p1_gate, p2_lift)
 
-        # 5. Save to memory
+            # Sampling: Pamphlet Distribution
+            elif "PAMPHLET DISTRIBUTION" in slide_text:
+                inject_pamphlet_image(slide, creative_image_bytes)
+
+        # 5. Save customized deck
         output_stream = io.BytesIO()
         prs.save(output_stream)
         output_stream.seek(0)
 
-        # 6. Upload new customized deck to Drive
+        # 6. Upload new presentation to Drive
         file_metadata = {
             'name': f"Pitch Deck - {brand_name} x NoBrokerHood.pptx",
             'mimeType': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
