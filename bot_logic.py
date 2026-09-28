@@ -2869,9 +2869,10 @@ Do not include chat preamble or markdown code blocks (```).
 
 def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client):
     """
-    Calls Gamma API to build a presentation.
-    Optimized to return the live deck link within seconds, preventing any Cloud Run timeouts.
-    Uses flush=True on all prints for immediate logging.
+    Calls Gamma API using the official public-api.gamma.app specification:
+    - Host: https://public-api.gamma.app/v1.0/generations
+    - Auth Header: X-API-KEY
+    - Payload: inputText, textMode, format, numCards, exportAs, themeId
     """
     if not GAMMA_API_KEY:
         print("  ⚠️ [GAMMA] GAMMA_API_KEY is not set. Skipping PPT generation.", flush=True)
@@ -2880,71 +2881,80 @@ def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client):
     print(f"  📊 [GAMMA] Preparing pitch deck content for '{brand_name}'...", flush=True)
     deck_markdown = prepare_gamma_deck_content_with_gemini(gemini_client, brand_name, brief_text)
 
+    # Official Gamma headers from Developer Documentation
     headers = {
-        "Authorization": f"Bearer {GAMMA_API_KEY}",
+        "X-API-KEY": GAMMA_API_KEY,
         "Content-Type": "application/json"
     }
 
+    # Official Gamma request payload
     payload = {
         "inputText": deck_markdown,
-        "prompt": deck_markdown,
-        "textFormat": "markdown",
+        "textMode": "generate",
         "format": "presentation",
-        "exportPptx": True
+        "numCards": 7,
+        "exportAs": "pptx"
     }
 
     if GAMMA_THEME_ID:
         payload["themeId"] = GAMMA_THEME_ID
 
-    primary_api_url = "https://api.gamma.app/v1/generations"
-    fallback_api_url = "https://api.gamma.app/generations"
+    api_url = "https://public-api.gamma.app/v1.0/generations"
 
     try:
-        print(f"  🚀 [GAMMA] Sending generation request...", flush=True)
-        response = requests.post(primary_api_url, headers=headers, json=payload, timeout=15)
-
-        if response.status_code == 404:
-            print(f"  ⚠️ [GAMMA] Route /v1/ returned 404, trying fallback: {fallback_api_url}...", flush=True)
-            response = requests.post(fallback_api_url, headers=headers, json=payload, timeout=15)
+        print(f"  🚀 [GAMMA] Sending generation request to {api_url}...", flush=True)
+        response = requests.post(api_url, headers=headers, json=payload, timeout=20)
+        
+        # If themeId is rejected as invalid, automatically retry without it
+        if response.status_code == 404 and GAMMA_THEME_ID:
+            print("  ⚠️ [GAMMA] Theme ID not found. Retrying with default theme...", flush=True)
+            payload_no_theme = payload.copy()
+            payload_no_theme.pop("themeId", None)
+            response = requests.post(api_url, headers=headers, json=payload_no_theme, timeout=20)
 
         if response.status_code not in [200, 201, 202]:
-            print(f"  ⚠️ [GAMMA] API Error ({response.status_code}): {response.text}", flush=True)
+            print(f"  ❌ [GAMMA] API Error ({response.status_code}): {response.text}", flush=True)
             return None
 
         gen_data = response.json()
-        generation_id = gen_data.get("generationId") or gen_data.get("id") or gen_data.get("docId")
-
-        # If immediate URL was provided
-        direct_url = gen_data.get("url") or gen_data.get("gammaUrl") or gen_data.get("exportUrl")
-        if direct_url and not generation_id:
-            print(f"  ✅ [GAMMA] Pitch deck URL created: {direct_url}", flush=True)
-            return {"gamma_url": direct_url, "pptx_download_url": direct_url}
+        generation_id = gen_data.get("generationId")
 
         if not generation_id:
-            print(f"  ⚠️ [GAMMA] Could not parse generation ID: {gen_data}", flush=True)
+            print(f"  ⚠️ [GAMMA] No generationId returned: {gen_data}", flush=True)
             return None
 
-        # Build live presentation URLs
+        print(f"  ⏳ [GAMMA] Presentation generation initiated (ID: {generation_id}). Polling status...", flush=True)
+
+        # Poll status every 4 seconds (up to 7 attempts = 28 seconds max)
+        poll_url = f"https://public-api.gamma.app/v1.0/generations/{generation_id}"
         live_deck_url = f"https://gamma.app/docs/{generation_id}"
         pptx_url = live_deck_url
-        print(f"  ⏳ [GAMMA] Presentation created (ID: {generation_id}). Polling export status...", flush=True)
 
-        # Single quick check (2-3 seconds max)
-        poll_url = f"https://api.gamma.app/v1/generations/{generation_id}"
-        time.sleep(2.5)
-        try:
-            poll_resp = requests.get(poll_url, headers=headers, timeout=5)
-            if poll_resp.status_code == 200:
-                pdata = poll_resp.json()
-                status = str(pdata.get("status", "")).lower()
-                if status in ["completed", "complete", "done", "success"]:
-                    live_deck_url = pdata.get("url") or pdata.get("gammaUrl") or live_deck_url
-                    pptx_url = pdata.get("exportUrl") or pdata.get("pptxUrl") or live_deck_url
-                    print(f"  ✅ [GAMMA] Direct export ready: {pptx_url}", flush=True)
-        except Exception:
-            pass
+        for attempt in range(7):
+            time.sleep(4)
+            try:
+                poll_resp = requests.get(poll_url, headers=headers, timeout=10)
+                if poll_resp.status_code == 200:
+                    poll_data = poll_resp.json()
+                    status = str(poll_data.get("status", "")).lower()
 
-        print(f"  ✅ [GAMMA] Pitch deck linked successfully: {live_deck_url}", flush=True)
+                    if status in ["completed", "complete", "done", "success"]:
+                        live_deck_url = poll_data.get("gammaUrl") or poll_data.get("url") or live_deck_url
+                        pptx_url = poll_data.get("exportUrl") or live_deck_url
+                        print(f"  ✅ [GAMMA] Presentation complete! Deck: {live_deck_url} | PPTX: {pptx_url}", flush=True)
+                        return {
+                            "gamma_url": live_deck_url,
+                            "pptx_download_url": pptx_url
+                        }
+                    elif status in ["failed", "error"]:
+                        print(f"  ❌ [GAMMA] Generation failed: {poll_data.get('error')}", flush=True)
+                        return None
+                    else:
+                        print(f"    ... Rendering deck cards ({attempt + 1}/7). Status: {status}", flush=True)
+            except Exception as poll_err:
+                print(f"    ⚠️ Polling error: {poll_err}", flush=True)
+
+        print(f"  ✅ [GAMMA] Pitch deck ready (live web link): {live_deck_url}", flush=True)
         return {
             "gamma_url": live_deck_url,
             "pptx_download_url": pptx_url
