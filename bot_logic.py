@@ -2869,10 +2869,8 @@ Do not include chat preamble or markdown code blocks (```).
 
 def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client):
     """
-    Calls Gamma API using the official public-api.gamma.app specification:
-    - Host: https://public-api.gamma.app/v1.0/generations
-    - Auth Header: X-API-KEY
-    - Payload: inputText, textMode, format, numCards, exportAs, themeId
+    Calls Gamma API using the official public-api.gamma.app specification.
+    Polls until status is 'completed' to guarantee the true document URL and PPTX export download link.
     """
     if not GAMMA_API_KEY:
         print("  ⚠️ [GAMMA] GAMMA_API_KEY is not set. Skipping PPT generation.", flush=True)
@@ -2923,14 +2921,12 @@ def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client):
             print(f"  ⚠️ [GAMMA] No generationId returned: {gen_data}", flush=True)
             return None
 
-        print(f"  ⏳ [GAMMA] Presentation generation initiated (ID: {generation_id}). Polling status...", flush=True)
+        print(f"  ⏳ [GAMMA] Presentation generation initiated (ID: {generation_id}). Waiting for completion...", flush=True)
 
-        # Poll status every 4 seconds (up to 7 attempts = 28 seconds max)
+        # Poll status every 4 seconds (up to 14 attempts = ~55 seconds max)
         poll_url = f"https://public-api.gamma.app/v1.0/generations/{generation_id}"
-        live_deck_url = f"https://gamma.app/docs/{generation_id}"
-        pptx_url = live_deck_url
 
-        for attempt in range(7):
+        for attempt in range(14):
             time.sleep(4)
             try:
                 poll_resp = requests.get(poll_url, headers=headers, timeout=10)
@@ -2939,26 +2935,28 @@ def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client):
                     status = str(poll_data.get("status", "")).lower()
 
                     if status in ["completed", "complete", "done", "success"]:
-                        live_deck_url = poll_data.get("gammaUrl") or poll_data.get("url") or live_deck_url
-                        pptx_url = poll_data.get("exportUrl") or live_deck_url
-                        print(f"  ✅ [GAMMA] Presentation complete! Deck: {live_deck_url} | PPTX: {pptx_url}", flush=True)
+                        # Extract the verified document URL and PPTX export URL
+                        verified_deck_url = poll_data.get("gammaUrl") or poll_data.get("url")
+                        verified_pptx_url = poll_data.get("exportUrl") or verified_deck_url
+
+                        print(f"  ✅ [GAMMA] Presentation complete!", flush=True)
+                        print(f"      📄 View Deck: {verified_deck_url}", flush=True)
+                        print(f"      📥 Download PPTX: {verified_pptx_url}", flush=True)
+                        
                         return {
-                            "gamma_url": live_deck_url,
-                            "pptx_download_url": pptx_url
+                            "gamma_url": verified_deck_url,
+                            "pptx_download_url": verified_pptx_url
                         }
                     elif status in ["failed", "error"]:
                         print(f"  ❌ [GAMMA] Generation failed: {poll_data.get('error')}", flush=True)
                         return None
                     else:
-                        print(f"    ... Rendering deck cards ({attempt + 1}/7). Status: {status}", flush=True)
+                        print(f"    ... Rendering deck cards ({attempt + 1}/14). Status: {status}", flush=True)
             except Exception as poll_err:
                 print(f"    ⚠️ Polling error: {poll_err}", flush=True)
 
-        print(f"  ✅ [GAMMA] Pitch deck ready (live web link): {live_deck_url}", flush=True)
-        return {
-            "gamma_url": live_deck_url,
-            "pptx_download_url": pptx_url
-        }
+        print("  ⚠️ [GAMMA] Generation took longer than 55s. PPT link not finalized.", flush=True)
+        return None
 
     except Exception as e:
         print(f"  ⚠️ [GAMMA] Exception during PPT generation: {e}", flush=True)
