@@ -56,6 +56,8 @@ jobs:
           SERPER_API_KEY=${{ secrets.SERPER_API_KEY }}
           NBH_GDRIVE_FOLDER_ID=${{ secrets.NBH_GDRIVE_FOLDER_ID }}
           ADMIN_EMAIL_FOR_NOTIFICATIONS=${{ secrets.ADMIN_EMAIL_FOR_NOTIFICATIONS }}
+          GAMMA_API_KEY=${{ secrets.GAMMA_API_KEY }}
+          GAMMA_THEME_ID=${{ secrets.GAMMA_THEME_ID }}
           CALENDAR_TOKEN=calendar_token.json
           GMAIL_TOKEN=gmail_token.json
           DRIVE_TOKEN=drive_token.json
