@@ -2361,8 +2361,8 @@ def send_unknown_brand_sop_email(gmail_service, meeting_data):
     )
     print(f"  📤 Sending Unknown Brand SOP Email for '{meeting_title}' TO Organizer: [{organizer}] | CC: {cc_list}")
     send_gmail_message(gmail_service, 'me', email_message)
-def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_bytes=None):
-    """Sends the brief email, injecting the AI creative if available. Includes TEST MODE."""
+def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_bytes=None, pitch_deck_info=None):
+    """Sends the brief email, injecting the AI creative and Gamma Pitch Deck button if available."""
     EXCLUDED_EMAILS = {AGENT_EMAIL.lower(), "pia.brand@nobroker.in", "pia.hood@nobroker.in", "meetings.regional@gmail.com"} 
 
     nbh_recipient_emails = []
@@ -2390,7 +2390,7 @@ def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_
 
     email_subject = f"[{'TEST' if TEST_MODE else 'Pre-Meeting Brief'}]: {meeting_data['title']} with {meeting_data['brand_name']}"
     
-    # --- Build and Inject the Event ID Box with Bright Yellow styling ---
+    # --- 1. Event ID Box ---
     event_id_val = meeting_data.get('id', 'N/A')
     event_id_box_html = (
         f'<div class="event-id-box">'
@@ -2398,7 +2398,7 @@ def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_
         f'</div>'
     )
 
-    # --- Build the Top 100 Sites Orange Highlight Box ---
+    # --- 2. Top 100 Sites Orange Highlight Box ---
     top_sites_url = "https://docs.google.com/spreadsheets/d/1NiYih9q_Gb-D6lCUjd08eDrsVAAJFqo6SRkBk8vzgrI/edit?gid=0#gid=0"
     top_sites_box_html = (
         f'<div class="top-sites-box">'
@@ -2406,8 +2406,22 @@ def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_
         f'</div>'
     )
 
-    # Stack both boxes cleanly
-    combined_boxes_html = f"{event_id_box_html}<br>{top_sites_box_html}"
+    # --- 3. Yellow Customized Executive Pitch Deck Box (Exact Match to Your Screenshot) ---
+    pitch_deck_box_html = ""
+    if pitch_deck_info and pitch_deck_info.get("pptx_download_url"):
+        deck_link = pitch_deck_info.get("pptx_download_url")
+        pitch_deck_box_html = (
+            f'<div class="pitch-deck-box">'
+            f'🎨 <strong>Customized Executive Pitch Deck:</strong> '
+            f'<a href="{deck_link}" class="pitch-deck-link" target="_blank">Click Here to Open Pitch Deck (.PPTX)</a>'
+            f'</div>'
+        )
+
+    # Stack boxes cleanly in the exact visual sequence
+    if pitch_deck_box_html:
+        combined_boxes_html = f"{event_id_box_html}<br>{top_sites_box_html}<br>{pitch_deck_box_html}"
+    else:
+        combined_boxes_html = f"{event_id_box_html}<br>{top_sites_box_html}"
 
     # Search for the Brand Attendees line in the markdown and insert the combined HTML boxes directly beneath it
     brand_attendees_pattern = re.compile(r'(Brand Attendees\s*:.*?)(\n|$)', re.IGNORECASE)
@@ -2478,7 +2492,7 @@ def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_
             color: #3c4043;
         }}
 
-        /* NEW: Orange Highlight Box for Top 100 Sites */
+        /* Orange Highlight Box for Top 100 Sites */
         .top-sites-box {{
             background-color: #fff5eb;
             border: 1px solid #ff9800;
@@ -2486,7 +2500,7 @@ def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_
             border-radius: 6px;
             padding: 10px 16px;
             margin-top: 5px;
-            margin-bottom: 20px;
+            margin-bottom: 8px;
             display: inline-block;
             font-size: 14px;
             font-weight: bold;
@@ -2496,6 +2510,26 @@ def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_
             color: #0066cc;
             text-decoration: underline;
             margin-left: 5px;
+        }}
+
+        /* Customized Pitch Deck Box (Exact Match to Your Screenshot) */
+        .pitch-deck-box {{
+            background-color: #fffde7;
+            border: 1.5px solid #fbc02d;
+            color: #795548;
+            border-radius: 6px;
+            padding: 11px 16px;
+            margin-top: 5px;
+            margin-bottom: 20px;
+            display: inline-block;
+            font-size: 14px;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }}
+        .pitch-deck-link {{
+            color: #0d47a1;
+            font-weight: bold;
+            text-decoration: underline;
+            margin-left: 4px;
         }}
     </style>
     </head>
@@ -2530,7 +2564,7 @@ def send_brief_email(gmail_service, meeting_data, brief_content, creative_image_
         subject=email_subject,
         message_text_html=email_body_html,
         image_bytes=creative_image_bytes,
-        brand_name=meeting_data.get('brand_name') # Added parameter
+        brand_name=meeting_data.get('brand_name')
     )
     print(f"  FINAL CHECK: Sending styled brief for '{meeting_data['title']}' TO: {nbh_recipient_emails}")
     send_gmail_message(gmail_service, 'me', email_message)
@@ -2759,9 +2793,158 @@ def write_into_doc(docs_service, doc_id, text):
 
 
 # =====================================================================
-# PPT GENERATION HELPER FUNCTIONS REMOVED
+# GAMMA API CONFIGURATION & PPT AUTOMATION MODULE
 # =====================================================================
-# Clean slate: PPT helper logic deleted to avoid execution during Serper testing.
+GAMMA_API_KEY = os.getenv("GAMMA_API_KEY", "").strip().replace('"', '').replace("'", "")
+GAMMA_THEME_ID = os.getenv("GAMMA_THEME_ID", "").strip().replace('"', '').replace("'", "")
+
+def prepare_gamma_deck_content_with_gemini(gemini_client, brand_name, brief_text):
+    """
+    Transforms the Pre-Meeting Brief into a structured, highly relevant
+    7-slide client sales presentation outline in Markdown format.
+    """
+    if not gemini_client or not brief_text:
+        return f"# Partnership Proposal: {brand_name} X NoBrokerHood\nExclusive Resident Monetization"
+
+    prompt = f"""
+You are the Head of Brand Partnerships & Ad Sales at NoBrokerHood (NBH).
+NBH is India's leading gated society resident super-app operating across Tier-1 cities.
+Our ad assets:
+- Physical: Main Entry/Exit Society Gate Banners, Captive Elevator/Lift Snap Frames.
+- Digital: Resident Mobile App (Delivery Pre-Approval Cards, Splash Screen, Island Banners).
+- Experiential: Weekend Doorstep Product Sampling, Clubhouse Stalls/Canopy Kiosks.
+
+Review this internal Pre-Meeting Brief for '{brand_name}':
+---
+{brief_text}
+---
+
+Your task: Convert this intelligence into an external, 7-slide client pitch deck outline in Markdown format.
+
+SLIDE STRUCTURE:
+# Slide 1: Partnership Proposal: {brand_name} X NoBrokerHood
+- Subtitle: Unlocking India's Most Affluent Gated Society Communities
+- Presented by: NoBrokerHood Brand Partnerships Team
+
+# Slide 2: The Audience Advantage: Who You Reach on NBH
+- Tier-1 Gated Communities: High-density, high-income families across Mumbai, Bangalore, NCR, Pune, Hyderabad, Chennai.
+- Zero Ad-Blockers: 100% verified daily footfall through physical society entry points and daily app interactions.
+
+# Slide 3: Strategic Opportunity for {brand_name}
+- Contextualize their market positioning, new launches, or current brand goals (referenced in Brief Section 1 & 2).
+- Why reaching affluent gated communities matches their growth priorities.
+
+# Slide 4: Strategic Angle & Campaign Theme
+- Campaign Hook & Creative Direction (derived from Section 3 of the brief).
+- Why this specific angle resonates with residential homeowners.
+
+# Slide 5: The Omnichannel Media Mix: High-Impact NBH Assets
+- Physical Transit: Main Society Gate Banners (high recall) + Captive Elevator Snap Frames (undivided 45-sec attention).
+- Digital In-App: Delivery Pre-Approval Cards + Native Home Screen Banners.
+- Experiential: Doorstep Delivery Sampling + Weekend Canopy Kiosks.
+
+# Slide 6: Proven Benchmarks & Impact Metrics
+- Concrete benchmarks or similar category results (derived from Section 4 & 5 of the brief).
+- Expected engagement, high CTRs, and zero-spillage direct consumer impressions.
+
+# Slide 7: Phased Rollout & Partnership Next Steps
+- Suggested pilot society selection (A+ category societies).
+- Execution timeline, flight duration, and measurement parameters.
+
+Format strictly as clean markdown with `# Slide Title` and clear bullet points for each slide.
+Do not include chat preamble or markdown code blocks (```).
+"""
+    try:
+        config = types.GenerateContentConfig(temperature=0.2)
+        response = gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=config
+        )
+        return response.text.strip()
+    except Exception as e:
+        print(f"  ⚠️ Error generating Gamma outline via Gemini: {e}")
+        return brief_text[:2500]
+
+
+def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client):
+    """
+    Calls Gamma API to build a presentation and exports it to PPTX.
+    Returns:
+        dict: {'gamma_url': str, 'pptx_download_url': str} or None on failure.
+    """
+    if not GAMMA_API_KEY:
+        print("  ⚠️ [GAMMA] GAMMA_API_KEY is not set. Skipping PPT generation.")
+        return None
+
+    print(f"  📊 [GAMMA] Preparing pitch deck content for '{brand_name}'...")
+    deck_markdown = prepare_gamma_deck_content_with_gemini(gemini_client, brand_name, brief_text)
+
+    api_url = "https://api.gamma.app/v1.0/generations"
+    headers = {
+        "Authorization": f"Bearer {GAMMA_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "inputText": deck_markdown,
+        "textFormat": "markdown",
+        "format": "presentation",
+        "exportPptx": True
+    }
+
+    if GAMMA_THEME_ID:
+        payload["themeId"] = GAMMA_THEME_ID
+
+    try:
+        print(f"  🚀 [GAMMA] Sending request to Gamma API...")
+        response = requests.post(api_url, headers=headers, json=payload, timeout=30)
+        
+        if response.status_code not in [200, 201, 202]:
+            print(f"  ⚠️ [GAMMA] API Error ({response.status_code}): {response.text}")
+            return None
+
+        gen_data = response.json()
+        generation_id = gen_data.get("generationId") or gen_data.get("id")
+
+        if not generation_id:
+            doc_url = gen_data.get("url") or gen_data.get("gammaUrl")
+            if doc_url:
+                return {"gamma_url": doc_url, "pptx_download_url": doc_url}
+            return None
+
+        print(f"  ⏳ [GAMMA] Presentation generation queued (ID: {generation_id}). Polling status...")
+        poll_url = f"https://api.gamma.app/v1.0/generations/{generation_id}"
+        
+        # Poll up to 90 seconds (15 checks x 6 seconds)
+        for attempt in range(15):
+            time.sleep(6)
+            poll_resp = requests.get(poll_url, headers=headers, timeout=15)
+            
+            if poll_resp.status_code == 200:
+                poll_data = poll_resp.json()
+                status = str(poll_data.get("status", "")).lower()
+
+                if status in ["completed", "complete", "done", "success"]:
+                    gamma_url = poll_data.get("url") or poll_data.get("gammaUrl") or f"https://gamma.app/docs/{generation_id}"
+                    pptx_url = poll_data.get("exportUrl") or poll_data.get("pptxUrl") or gamma_url
+                    print(f"  ✅ [GAMMA] Pitch deck successfully created: {gamma_url}")
+                    return {
+                        "gamma_url": gamma_url,
+                        "pptx_download_url": pptx_url
+                    }
+                elif status in ["failed", "error"]:
+                    print(f"  ❌ [GAMMA] Generation failed: {poll_data.get('error')}")
+                    return None
+                else:
+                    print(f"    ... Building cards ({attempt + 1}/15). Status: {status}")
+
+        fallback_url = f"https://gamma.app/docs/{generation_id}"
+        return {"gamma_url": fallback_url, "pptx_download_url": fallback_url}
+
+    except Exception as e:
+        print(f"  ⚠️ [GAMMA] Exception during PPT generation: {e}")
+        return None
 
 
 def get_sheet_owner_from_email(email):
@@ -3123,7 +3306,7 @@ def main():
         creative_image_bytes = None
         if ENABLE_IMAGE_GENERATION and generated_brief and "Error:" not in generated_brief:
             try:
-                print(f"  🎨 Generating strategic mockup image for '{meeting_data['title']}'...")
+                print(f"   Generating strategic mockup image for '{meeting_data['title']}'...")
                 matched_past = internal_data_result.get("matched_past_context")
                 visual_context = get_brand_visual_context(
                     gemini_llm_client, 
@@ -3136,6 +3319,27 @@ def main():
                     creative_image_bytes = generate_creative_with_gemini_image(gemini_llm_client, meeting_data['brand_name'], meeting_data['industry'], visual_context)
             except Exception as e:
                 print(f"  Warning: Failed to generate creative image: {e}")
+
+        # =====================================================================
+        # STEP 8B: GAMMA PITCH DECK AUTOMATION (TRIGGERED ONLY ON "(TESTING)")
+        # =====================================================================
+        pitch_deck_info = None
+        is_testing_title = "(testing)" in meeting_data.get('title', '').lower()
+
+        if is_testing_title and generated_brief and "Error:" not in generated_brief:
+            print(f"  🧪 [TESTING MODE DETECTED] Triggering Gamma PPT deck generation for '{meeting_data['title']}'...")
+            try:
+                pitch_deck_info = generate_gamma_pitch_deck(
+                    brand_name=meeting_data['brand_name'],
+                    brief_text=generated_brief,
+                    gemini_client=gemini_llm_client
+                )
+            except Exception as e_gamma:
+                print(f"  ⚠️ Warning: Gamma pitch deck generation failed: {e_gamma}")
+                pitch_deck_info = None
+        else:
+            if not is_testing_title:
+                print(f"  ⏭️ Skipping Gamma PPT generation: Meeting title '{meeting_data['title']}' does not contain '(Testing)'.")
 
         # Feedback footer injection
         FEEDBACK_FORM_URL = "https://forms.gle/Ho9XLKsuGYhWBrBw7"
@@ -3153,9 +3357,15 @@ def main():
             print(f"  Failed to generate brief for '{meeting_data['title']}': {generated_brief}")
             continue
 
-        # Step 9: Send Email Brief to Attendees
+        # Step 9: Send Email Brief to Attendees (Passing pitch_deck_info)
         print(f"  Successfully generated brief for '{meeting_data['title']}'.")
-        send_brief_email(gmail_service, meeting_data, generated_brief, creative_image_bytes)
+        send_brief_email(
+            gmail_service=gmail_service, 
+            meeting_data=meeting_data, 
+            brief_content=generated_brief, 
+            creative_image_bytes=creative_image_bytes,
+            pitch_deck_info=pitch_deck_info
+        )
         
         tag_event_as_processed(calendar_service, event_id) 
         set_one_hour_email_reminder(calendar_service, event_id) 
