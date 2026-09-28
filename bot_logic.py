@@ -2955,7 +2955,7 @@ def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client, creative_im
     api_url = "https://public-api.gamma.app/v1.0/generations"
 
     try:
-        print(f"  🚀 [GAMMA] Sending generation request to {api_url}...", flush=True)
+        print(f"   [GAMMA] Sending generation request to {api_url}...", flush=True)
         response = requests.post(api_url, headers=headers, json=payload, timeout=20)
         
         if response.status_code == 404 and GAMMA_THEME_ID:
