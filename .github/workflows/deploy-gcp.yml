@@ -47,7 +47,7 @@ jobs:
         service: nbh-meeting-bot
         region: us-central1
         image: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/bot-repo/nbh-bot:latest
-        timeout: 3600
+        flags: '--timeout=1200'
         env_vars: |-
           GOOGLE_CLOUD_PROJECT=${{ secrets.GCP_PROJECT_ID }}
           PUBSUB_TOPIC_ID=calendar-updates
