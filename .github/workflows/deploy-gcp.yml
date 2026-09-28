@@ -64,3 +64,4 @@ jobs:
           SHEET_TOKEN=sheets_token.json
           DOCS_TOKEN=docs_token.json
           GOOGLE_CREDENTIALS_FILE=credentials.json
+          GCS_CREATIVES_BUCKET=nbh-deck-creatives
