@@ -2795,64 +2795,110 @@ def write_into_doc(docs_service, doc_id, text):
 # =====================================================================
 # GAMMA API CONFIGURATION & PPT AUTOMATION MODULE
 # =====================================================================
+from google.cloud import storage
+
 GAMMA_API_KEY = os.getenv("GAMMA_API_KEY", "").strip().replace('"', '').replace("'", "")
 GAMMA_THEME_ID = os.getenv("GAMMA_THEME_ID", "").strip().replace('"', '').replace("'", "")
+GCS_BUCKET_NAME = os.getenv("GCS_CREATIVES_BUCKET", "nbh-deck-creatives")
 
-def prepare_gamma_deck_content_with_gemini(gemini_client, brand_name, brief_text):
+def upload_creative_to_gcs(image_bytes, brand_name, event_id):
     """
-    Transforms the Pre-Meeting Brief into a structured, highly relevant
-    7-slide client sales presentation outline in Markdown format.
+    Uploads the dynamically generated 3-panel creative mockup to Google Cloud Storage
+    and returns a public URL so Gamma can embed it directly into the presentation slides.
+    """
+    if not image_bytes:
+        return None
+    try:
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(GCS_BUCKET_NAME)
+        safe_brand = re.sub(r'[^a-zA-Z0-9]', '_', brand_name).lower()
+        blob_name = f"creatives/{safe_brand}_{event_id}.jpg"
+        blob = bucket.blob(blob_name)
+        
+        blob.upload_from_string(image_bytes, content_type="image/jpeg")
+        public_url = f"https://storage.googleapis.com/{GCS_BUCKET_NAME}/{blob_name}"
+        print(f"  ☁️ [GCS] Uploaded custom creative mockup: {public_url}", flush=True)
+        return public_url
+    except Exception as e:
+        print(f"  ⚠️ [GCS] Could not upload creative to bucket: {e}", flush=True)
+        return None
+
+
+def prepare_gamma_deck_content_with_gemini(gemini_client, brand_name, brief_text, custom_mockup_url=None):
+    """
+    Transforms the Pre-Meeting Brief into a structured, highly professional
+    client-facing presentation outline modeled directly on NoBrokerHood's official master sales deck.
+    Embeds the brand's custom live mockup so Gamma renders real assets instead of AI illustrations.
     """
     if not gemini_client or not brief_text:
-        return f"# Partnership Proposal: {brand_name} X NoBrokerHood\nExclusive Resident Monetization"
+        return f"# NoBrokerHood × {brand_name}\nHyperlocal Resident Monetization"
+
+    mockup_markdown_instruction = ""
+    if custom_mockup_url:
+        mockup_markdown_instruction = f"""
+CRITICAL IMAGE INSTRUCTION FOR SLIDE 5:
+Embed this EXACT custom mockup image on Slide 5 showing the real Gate Banner, Lift Frame, and Mobile App created for {brand_name}:
+![{brand_name} Omnichannel Mockup]({custom_mockup_url})
+"""
 
     prompt = f"""
-You are the Head of Brand Partnerships & Ad Sales at NoBrokerHood (NBH).
-NBH is India's leading gated society resident super-app operating across Tier-1 cities.
-Our ad assets:
-- Physical: Main Entry/Exit Society Gate Banners, Captive Elevator/Lift Snap Frames.
-- Digital: Resident Mobile App (Delivery Pre-Approval Cards, Splash Screen, Island Banners).
-- Experiential: Weekend Doorstep Product Sampling, Clubhouse Stalls/Canopy Kiosks.
+You are the Head of Brand Monetization & Ad Partnerships at NoBrokerHood (NBH).
+NBH is India's first PropTech Unicorn, operating in 25,000+ premium gated societies across Tier-1 cities 
+(Bangalore, Mumbai, Delhi-NCR, Pune, Hyderabad, Chennai) with 16 Lakh+ verified daily visitor approvals.
 
-Review this internal Pre-Meeting Brief for '{brand_name}':
+Analyze this internal Pre-Meeting Brief for '{brand_name}':
 ---
 {brief_text}
 ---
 
-Your task: Convert this intelligence into an external, 7-slide client pitch deck outline in Markdown format.
+Your task: Convert this into an executive, agency-grade 8-slide client sales presentation in Markdown format.
+Follow the exact structure of NoBrokerHood's Master Pitch Deck:
+
+{mockup_markdown_instruction}
 
 SLIDE STRUCTURE:
-# Slide 1: Partnership Proposal: {brand_name} X NoBrokerHood
+# Slide 1: Partnership Proposal: NoBrokerHood × {brand_name}
+- Title: Transforming Hyperlocal Engagement for {brand_name}
 - Subtitle: Unlocking India's Most Affluent Gated Society Communities
-- Presented by: NoBrokerHood Brand Partnerships Team
+- Footer: Presented by NoBrokerHood Brand Partnerships Team
 
-# Slide 2: The Audience Advantage: Who You Reach on NBH
-- Tier-1 Gated Communities: High-density, high-income families across Mumbai, Bangalore, NCR, Pune, Hyderabad, Chennai.
-- Zero Ad-Blockers: 100% verified daily footfall through physical society entry points and daily app interactions.
+# Slide 2: The Audience Advantage: Scale & Demographics
+- 25,000+ Societies across 15 Tier-1 Cities (Bangalore, Mumbai, Delhi-NCR, Pune, Hyderabad, Chennai)
+- 16 Lakh Daily Visitor Approvals with 100% verified, captive resident footfall
+- 70-75% Audience living in premium properties valued > ₹1 Crore (SEC A/B Households)
+- ₹320 Crore+ Monthly In-App Valued Transactions
 
 # Slide 3: Strategic Opportunity for {brand_name}
-- Contextualize their market positioning, new launches, or current brand goals (referenced in Brief Section 1 & 2).
-- Why reaching affluent gated communities matches their growth priorities.
+- Contextualize their live market push, new product launches, or active campaigns from Brief Section 1 & 2.
+- Why reaching high-income families inside their residential ecosystem provides zero-ad-fatigue engagement.
 
-# Slide 4: Strategic Angle & Campaign Theme
-- Campaign Hook & Creative Direction (derived from Section 3 of the brief).
-- Why this specific angle resonates with residential homeowners.
+# Slide 4: Proposed Campaign Theme & Strategic Angle
+- The Core Hook & Campaign Angle (pulled directly from Section 3 of the brief).
+- Why this specific pitch solves their customer acquisition and localized brand-recall challenges.
 
-# Slide 5: The Omnichannel Media Mix: High-Impact NBH Assets
-- Physical Transit: Main Society Gate Banners (high recall) + Captive Elevator Snap Frames (undivided 45-sec attention).
-- Digital In-App: Delivery Pre-Approval Cards + Native Home Screen Banners.
-- Experiential: Doorstep Delivery Sampling + Weekend Canopy Kiosks.
+# Slide 5: The Omnichannel Media Showcase: Physical & Digital Touchpoints
+{"![Customized Ad Placements](" + custom_mockup_url + ")" if custom_mockup_url else ""}
+- Outdoor Gate Banners: High-impact awareness as residents enter and exit daily.
+- Captive Lift Snap Frames: 45-second high-focus transit moments inside residential towers.
+- Native Resident App: Delivery Pre-Approval Cards (PAC) capturing attention when orders arrive.
 
-# Slide 6: Proven Benchmarks & Impact Metrics
-- Concrete benchmarks or similar category results (derived from Section 4 & 5 of the brief).
-- Expected engagement, high CTRs, and zero-spillage direct consumer impressions.
+# Slide 6: Digital Formats & High-Frequency In-App Real Estate
+- PAC (Post Approval Cards): Displayed to residents during delivery entry approvals with direct CTAs.
+- Home Screen Island Banners: High-frequency interactive banners driving qualified clicks.
+- Granular Targeting: Filterable by property value, micro-market, and resident purchase patterns.
 
-# Slide 7: Phased Rollout & Partnership Next Steps
-- Suggested pilot society selection (A+ category societies).
-- Execution timeline, flight duration, and measurement parameters.
+# Slide 7: Experiential Activations & Direct Doorstep Sampling
+- Door-to-Door (D2D) Sampling: Verified physical product samples delivered straight to residential doors.
+- Clubhouse & Weekend Canopies: Interactive booths, consultation kiosks, and live experiential pop-ups.
+- Real Benchmarks: Mention category case studies (e.g., Tata 1mg reached 37,500 doors; Orange Health executed 1,550 lift frames).
+
+# Slide 8: Proposed Rollout & Partnership Next Steps
+- Phase 1: High-affinity A+ society selection in priority Tier-1 clusters.
+- Phase 2: Integrated flight rollout combining Gate + Lift + In-App PAC banners.
+- Call to Action: Customized society inventory availability and pricing proposal.
 
 Format strictly as clean markdown with `# Slide Title` and clear bullet points for each slide.
-Do not include chat preamble or markdown code blocks (```).
+Do not use markdown code fences (```).
 """
     try:
         config = types.GenerateContentConfig(temperature=0.2)
@@ -2863,34 +2909,43 @@ Do not include chat preamble or markdown code blocks (```).
         )
         return response.text.strip()
     except Exception as e:
-        print(f"  ⚠️ Error generating Gamma outline via Gemini: {e}")
+        print(f"  ⚠️ Error generating Gamma outline via Gemini: {e}", flush=True)
         return brief_text[:2500]
 
 
-def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client):
+def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client, creative_image_bytes=None, event_id=""):
     """
     Calls Gamma API using the official public-api.gamma.app specification.
+    Uploads the brand's custom live mockup to GCS and embeds it into the deck.
     Polls until status is 'completed' to guarantee the true document URL and PPTX export download link.
     """
     if not GAMMA_API_KEY:
         print("  ⚠️ [GAMMA] GAMMA_API_KEY is not set. Skipping PPT generation.", flush=True)
         return None
 
-    print(f"  📊 [GAMMA] Preparing pitch deck content for '{brand_name}'...", flush=True)
-    deck_markdown = prepare_gamma_deck_content_with_gemini(gemini_client, brand_name, brief_text)
+    # Step 1: Upload the customized 3-panel mockup to GCS so Gamma can embed it
+    custom_mockup_url = None
+    if creative_image_bytes:
+        custom_mockup_url = upload_creative_to_gcs(creative_image_bytes, brand_name, event_id)
 
-    # Official Gamma headers from Developer Documentation
+    print(f"  📊 [GAMMA] Preparing agency-grade pitch deck for '{brand_name}'...", flush=True)
+    deck_markdown = prepare_gamma_deck_content_with_gemini(
+        gemini_client=gemini_client,
+        brand_name=brand_name,
+        brief_text=brief_text,
+        custom_mockup_url=custom_mockup_url
+    )
+
     headers = {
         "X-API-KEY": GAMMA_API_KEY,
         "Content-Type": "application/json"
     }
 
-    # Official Gamma request payload
     payload = {
         "inputText": deck_markdown,
         "textMode": "generate",
         "format": "presentation",
-        "numCards": 7,
+        "numCards": 8,
         "exportAs": "pptx"
     }
 
@@ -2903,7 +2958,6 @@ def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client):
         print(f"  🚀 [GAMMA] Sending generation request to {api_url}...", flush=True)
         response = requests.post(api_url, headers=headers, json=payload, timeout=20)
         
-        # If themeId is rejected as invalid, automatically retry without it
         if response.status_code == 404 and GAMMA_THEME_ID:
             print("  ⚠️ [GAMMA] Theme ID not found. Retrying with default theme...", flush=True)
             payload_no_theme = payload.copy()
@@ -2923,10 +2977,9 @@ def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client):
 
         print(f"  ⏳ [GAMMA] Presentation generation initiated (ID: {generation_id}). Waiting for completion...", flush=True)
 
-        # Poll status every 4 seconds (up to 14 attempts = ~55 seconds max)
         poll_url = f"https://public-api.gamma.app/v1.0/generations/{generation_id}"
 
-        for attempt in range(14):
+        for attempt in range(15):
             time.sleep(4)
             try:
                 poll_resp = requests.get(poll_url, headers=headers, timeout=10)
@@ -2935,7 +2988,6 @@ def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client):
                     status = str(poll_data.get("status", "")).lower()
 
                     if status in ["completed", "complete", "done", "success"]:
-                        # Extract the verified document URL and PPTX export URL
                         verified_deck_url = poll_data.get("gammaUrl") or poll_data.get("url")
                         verified_pptx_url = poll_data.get("exportUrl") or verified_deck_url
 
@@ -2951,11 +3003,11 @@ def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client):
                         print(f"  ❌ [GAMMA] Generation failed: {poll_data.get('error')}", flush=True)
                         return None
                     else:
-                        print(f"    ... Rendering deck cards ({attempt + 1}/14). Status: {status}", flush=True)
+                        print(f"    ... Rendering deck cards ({attempt + 1}/15). Status: {status}", flush=True)
             except Exception as poll_err:
                 print(f"    ⚠️ Polling error: {poll_err}", flush=True)
 
-        print("  ⚠️ [GAMMA] Generation took longer than 55s. PPT link not finalized.", flush=True)
+        print("  ⚠️ [GAMMA] Generation took longer than 60s. PPT link not finalized.", flush=True)
         return None
 
     except Exception as e:
@@ -3348,7 +3400,9 @@ def main():
                 pitch_deck_info = generate_gamma_pitch_deck(
                     brand_name=meeting_data['brand_name'],
                     brief_text=generated_brief,
-                    gemini_client=gemini_llm_client
+                    gemini_client=gemini_llm_client,
+                    creative_image_bytes=creative_image_bytes,  # <--- PASSES BRAND'S LIVE MOCKUP
+                    event_id=event_id                           # <--- UNIQUE FILE IDENTIFIER
                 )
             except Exception as e_gamma:
                 print(f"  ⚠️ Warning: Gamma pitch deck generation failed: {e_gamma}")
