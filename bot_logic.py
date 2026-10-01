@@ -9,7 +9,10 @@ import io # For GDrive downloads # For GDrive downloads
 import re
 import markdown 
 import json
-import fitz
+import warnings
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", category=UserWarning)
+    import fitz
 from google import genai
 from google.genai import types
 import enum
@@ -3061,10 +3064,16 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
 
     uploaded_deck = drive_service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink, webContentLink').execute()
 
-    # Set viewer permission for the link
-    drive_service.permissions().create(fileId=uploaded_deck['id'], body={'type': 'anyone', 'role': 'viewer'}).execute()
-
     view_url = uploaded_deck.get('webViewLink')
+
+    # Set public viewer permission ('reader' is the valid Google Drive v3 role)
+    try:
+        drive_service.permissions().create(
+            fileId=uploaded_deck['id'], 
+            body={'type': 'anyone', 'role': 'reader'}
+        ).execute()
+    except Exception as perm_err:
+        print(f"  ⚠️ Note on drive permissions: {perm_err}", flush=True)
 
     print(f"  ✅ [Deck Engine] 28-Slide Presentation Ready! Drive Link: {view_url}", flush=True)
     return {
