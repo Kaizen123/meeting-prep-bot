@@ -3194,6 +3194,9 @@ def main():
     print(f"Script started at {datetime.datetime.now()}")
     print(f"Using NBH GDrive Folder ID: {NBH_GDRIVE_FOLDER_ID}")
     
+    # Output folder for both Brief Docs and Master Pitch Decks (Defined upfront so all steps can access it)
+    BRIEF_FOLDER_ID = "1RhhsFq5NGC2QtHPj8FQaU5BfhxJR5R6I"
+
     # Load environment variables
     master_sheet_id = "1wWwjvAwXCAnPH3cAXSCaXlyDA7E9h_YrP4jaNFP9qvY" # main sheet 
     calendar_token = os.getenv("CALENDAR_TOKEN")
@@ -3600,7 +3603,6 @@ def main():
         save_processed_event_id(event_id)
         
         # Step 10: Create Google Doc & Update Sheet Link in Col H
-        BRIEF_FOLDER_ID = "1RhhsFq5NGC2QtHPj8FQaU5BfhxJR5R6I"
         doc_id = create_google_doc_in_folder(drive_service, BRIEF_FOLDER_ID, f"Pre-Meeting Brief - {meeting_data['brand_name']} - {meeting_data['title']}")
         if doc_id:
             write_into_doc(docs_service, doc_id=doc_id, text=generated_brief)
