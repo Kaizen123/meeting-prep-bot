@@ -2890,8 +2890,8 @@ Return ONLY a JSON object:
 def prepare_gamma_5_cards_with_gemini(gemini_client, brand_name, brief_text, custom_mockup_url=None):
     """
     Acts as Senior Brand Partnerships Strategist at NoBrokerHood.
-    Deep-mines the Pre-Meeting Brief, live campaigns, and creative hook to write
-    5 bespoke presentation slides that specifically pitch NoBrokerHood to that Brand.
+    Deep-mines the Pre-Meeting Brief, verified market news, and creative hook to write
+    5 bespoke, data-rich presentation cards for Gamma with comparison tables and micro-market targets.
     """
     if not gemini_client or not brief_text:
         return f"# Partnership Proposal: NoBrokerHood × {brand_name}\nHyperlocal Resident Monetization"
@@ -2899,13 +2899,13 @@ def prepare_gamma_5_cards_with_gemini(gemini_client, brand_name, brief_text, cus
     mockup_instruction = ""
     if custom_mockup_url:
         mockup_instruction = f"""
-CRITICAL IMAGE REQUIREMENT FOR SLIDE 3:
-Embed this EXACT customized ad mockup on Slide 3 showing {brand_name}'s live campaign placed on the society gate, lift frame, and app:
+CRITICAL MEDIA MOCKUP REQUIREMENT FOR SLIDE 3:
+Embed this EXACT live customized ad mockup on Slide 3 showing {brand_name}'s live campaign placed on the society gate, lift frame, and app:
 ![{brand_name} Omnichannel Mockup]({custom_mockup_url})
 """
 
     prompt = f"""
-You are the Head of Brand Monetization & Ad Partnerships at NoBrokerHood (NBH).
+You are the Head of Brand Partnerships & Ad Sales at NoBrokerHood (NBH).
 You are preparing an executive sales presentation to pitch NoBrokerHood's advertising ecosystem to '{brand_name}'.
 
 Here is the full Pre-Meeting Intelligence Brief for '{brand_name}' (including verified news, active campaigns, target demographics, and pain points):
@@ -2915,38 +2915,46 @@ Here is the full Pre-Meeting Intelligence Brief for '{brand_name}' (including ve
 
 {mockup_instruction}
 
-Your task: Write exactly 5 compelling, highly customized presentation cards in Markdown format for Gamma.
-Make this presentation read like a bespoke partnership deck specifically tailored to {brand_name}, not a generic template.
+IMPORTANT CONTEXT:
+The presentation already contains 23 static slides covering NoBrokerHood's general scale, app formats, and past company case studies.
+Therefore, DO NOT explain basic NoBrokerHood features in these 5 slides.
+Instead, write an ELITE, BRAND-SPECIFIC PROPOSAL tailored exclusively to {brand_name}.
 
-SLIDE REQUIREMENTS:
-# Slide 1: Strategic Proposition: Why {brand_name} × NoBrokerHood Right Now
-- Connect directly to their active market campaign or latest product push found in the brief (e.g., if they are launching a new variant, expanding delivery, or running festive sales, reference it explicitly).
-- Explain why reaching Tier-1 gated society residents inside their trusted residential environment solves their current customer acquisition challenges.
-- Highlight the high-intent, zero-ad-fatigue environment of gated communities.
+SLIDE BLUEPRINT:
+# Slide 1: The Hyperlocal Opportunity for {brand_name}
+- Reference their exact current market campaign, flagship sale, or active product push found in the brief (e.g. festive sales, new variant launches, quick-commerce expansion).
+- Contrast the challenges of open-web digital ads (high CAC, 40%+ ad fatigue, cluttered social feeds) with gated community residents.
+- Why gated societies represent the highest concentration of {brand_name}'s power buyers in Tier-1 India.
 
-# Slide 2: The Core Campaign Hook & Creative Direction
-- Synthesize the exact creative hook and strategic proposition from Section 3 of the brief.
-- Provide a bold campaign headline and 3 strategic pillars explaining why this theme resonates with residential homeowners.
-- Address their client pain points (e.g., high digital CAC, cluttered online feeds, need for verified footfall).
+# Slide 2: Campaign Strategy: {brand_name} High-Impact Blueprint
+- Synthesize the exact creative hook and strategic proposition from Section 3 of the brief into a bold headline.
+- 3 Strategic Pillars explaining how this campaign drives immediate consideration and trial among residential homeowners.
+- Focus on zero-spillage: 100% verified residential households, 0 wasted impressions.
 
-# Slide 3: Omnichannel Media Blueprint: Gate, Lift & Resident Super-App
+# Slide 3: In-Community Media Showcase: Gate, Lift & Resident Super-App
 {"![Live Placements for " + brand_name + "](" + custom_mockup_url + ")" if custom_mockup_url else ""}
-- Outdoor Gate Banners: 100% daily visual capture as affluent residents enter and exit their community.
-- Captive Lift Snap Frames: 45 seconds of undivided, high-focus attention inside high-rise residential towers.
-- Native Resident App: Delivery Pre-Approval Cards (PAC) capturing immediate attention right when groceries/orders arrive.
+- Entry/Exit Gate Banners: 100% daily visual capture as affluent residents commute in and out daily.
+- Captive Lift Snap Frames: 45 seconds of undivided dwell time inside high-rise residential towers.
+- Native Resident App: Delivery Pre-Approval Cards (PAC) capturing attention at the exact moment of order arrival.
 
-# Slide 4: Experiential Activations & Direct Doorstep Sampling
-- Tailor a physical trial strategy specifically suited to {brand_name}'s product categories (e.g., doorstep sampling, weekend clubhouse canopies, or vehicle display kiosks).
-- Benchmark against proven NoBrokerHood category activations (e.g., Tata 1mg reached 37,500 doors; Orange Health executed 1,550 lift frames; Mankind Pharma achieved 4 Lakh sample reach).
-- Emphasize verified 100% direct-to-consumer delivery with zero sample spillage.
+# Slide 4: Micro-Market Targeting & High-Affinity Clusters
+Create a clean Markdown table targeting {brand_name}'s core urban consumer base across Tier-1 metros:
+| City | Priority Gated Society Clusters | Target Consumer Cohort | Focus Media |
+| Bangalore | Whitefield, HSR, Bellandur, Sarjapur | Tech Professionals & High-E-com Spenders | Gate + Lift + App PAC |
+| Mumbai | Powai, Thane West, Andheri East, Lower Parel | High-Net-Worth & Affluent Families | Lift Frames + Canopy Activations |
+| Delhi-NCR | Gurgaon Golf Course Rd, Cyber City, Noida Sec 137 | Modern Corporate Executives & Homeowners | Gate Banners + App Notifications |
+| Pune | Kharadi, Hinjewadi, Wakad, Baner | Young Tech Families & Frequent Online Buyers | App PAC + Doorstep Sampling |
 
-# Slide 5: Recommended Flight Package & Measurable ROI
-- Target Inventory: Recommend priority A+ society clusters across Tier-1 metros (Bangalore, Mumbai, Delhi-NCR, Pune, Hyderabad).
-- Omnichannel Flight: Synchronized Gate + Lift + App PAC integration over a 4-to-6 week campaign window.
-- Expected Deliverables: High CTRs, verified resident reach, transparent post-campaign footfall & engagement metrics.
+# Slide 5: Recommended Partnership Flight & Measurable Performance KPIs
+- Recommended Flight Duration: 4 to 6 weeks synchronized omnichannel flight across selected A+ societies.
+- Expected Deliverables:
+  * 1.2% - 1.8% Benchmark CTR on interactive resident app delivery cards.
+  * 100% verified household impressions with zero digital bot traffic.
+  * Measurable conversion via exclusive community coupon codes and doorstep trial tracking.
+- Next Steps: Immediate society inventory lock-in and customized micro-market pricing.
 
-Format strictly as clean Markdown with `# Slide Title` and detailed, professional bullet points.
-Do not use markdown code blocks (```).
+Format strictly as clean Markdown with `# Slide Title`, clear bullet points, and the table on Slide 4.
+Do not use markdown code fences (```).
 """
     try:
         config = types.GenerateContentConfig(temperature=0.2)
@@ -2960,9 +2968,9 @@ Do not use markdown code blocks (```).
 def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id, gamma_pptx_bytes, brand_name, brief_text, gemini_client, output_folder_id):
     """
     1. Downloads the 23-slide Master Deck from Google Drive.
-    2. Updates Slide 1 Cover with prominent Brand Name next to the 'X' box.
-    3. Updates Slide 11 with full Objectives and Target Audience at readable font sizes.
-    4. Scales Gamma's slides proportionally to match the master widescreen dimensions.
+    2. Accurately anchors Brand Name on Slide 1 next to the 'X' box.
+    3. Updates Slide 11 Body (exactly once) with generous font sizes and paragraph spacing.
+    4. Scales Gamma's 5 proposal slides to 16:9 widescreen dimensions.
     5. Strips out default 'Click to add title' placeholders.
     6. Saves the polished 28-slide deck back to Google Drive.
     """
@@ -2982,33 +2990,27 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
 
     # --- STEP 1: UPDATE SLIDE 1 (COVER BRAND STAMP) ---
     slide_1 = prs_master.slides[0]
-    brand_stamped = False
     
-    # First attempt: find any text containing 'X'
+    # Locate the subtitle shape to get the exact horizontal and vertical anchor
+    anchor_left = Inches(9.8)
+    anchor_top = Inches(4.3)
     for shape in slide_1.shapes:
-        if shape.has_text_frame and "X" in shape.text_frame.text:
-            text = shape.text_frame.text.strip()
-            if text == "X" or len(text) <= 4:
-                shape.text_frame.text = f"X   {brand_name.upper()}"
-                for p in shape.text_frame.paragraphs:
-                    p.font.bold = True
-                    p.font.size = Pt(24)
-                    p.font.color.rgb = RGBColor(255, 255, 255)
-                brand_stamped = True
-                break
-    
-    # Fallback: add a clean, bold brand text box directly next to the X lockup
-    if not brand_stamped:
-        tx_box = slide_1.shapes.add_textbox(Inches(7.2), Inches(5.8), Inches(5.5), Inches(0.9))
-        tf = tx_box.text_frame
-        tf.word_wrap = True
-        p = tf.paragraphs[0]
-        p.text = brand_name.upper()
-        p.font.bold = True
-        p.font.size = Pt(26)
-        p.font.color.rgb = RGBColor(255, 255, 255)
+        if shape.has_text_frame and "TRANSFORMING COMMUNITIES" in shape.text_frame.text.upper():
+            anchor_left = shape.left + Inches(1.8)
+            anchor_top = shape.top - Inches(1.0)
+            break
 
-    # --- STEP 2: UPDATE SLIDE 11 ("HOW CAN WE HELP?") WITH FULL OBJECTIVES & AUDIENCE ---
+    # Add a clean, bold brand text box right next to the white X badge
+    tx_box = slide_1.shapes.add_textbox(anchor_left, anchor_top, Inches(4.5), Inches(0.8))
+    tf = tx_box.text_frame
+    tf.word_wrap = True
+    p = tf.paragraphs[0]
+    p.text = brand_name.upper()
+    p.font.bold = True
+    p.font.size = Pt(24)
+    p.font.color.rgb = RGBColor(255, 255, 255) # Pure White
+
+    # --- STEP 2: UPDATE SLIDE 11 ("HOW CAN WE HELP?") ---
     print(f"  ✍️ [Deck Engine] Injecting Gemini tailored campaign objectives & audience into Slide 11...", flush=True)
     slide_11 = prs_master.slides[10] # 0-indexed (Slide 11)
     slide_11_data = update_slide_11_objectives_with_gemini(gemini_client, brand_name, brief_text)
@@ -3016,9 +3018,14 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
     for shape in slide_11.shapes:
         if shape.has_text_frame:
             full_text = shape.text_frame.text
-            if "The primary objective of the campaign" in full_text or "HOW CAN WE HELP" in full_text:
+            # CRITICAL: Match ONLY the body box, NEVER match 'HOW CAN WE HELP' to avoid duplicate text
+            if "The primary objective of the campaign" in full_text and "HOW CAN WE HELP" not in full_text:
                 shape.text_frame.clear()
                 shape.text_frame.word_wrap = True
+                
+                # Make box slightly wider and taller to display text comfortably
+                shape.width = Inches(8.5)
+                shape.height = Inches(4.8)
 
                 # Section 1: Objectives Header
                 p_head1 = shape.text_frame.paragraphs[0]
@@ -3026,7 +3033,7 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
                 p_head1.font.bold = True
                 p_head1.font.size = Pt(15)
                 p_head1.font.color.rgb = RGBColor(253, 55, 82) # NoBroker Coral Red
-                p_head1.space_after = Pt(4)
+                p_head1.space_after = Pt(6)
 
                 # 5 Objectives Bullets
                 for obj in slide_11_data.get("campaign_objectives", []):
@@ -3034,7 +3041,7 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
                     p.text = f"• {obj}"
                     p.font.size = Pt(13)
                     p.font.color.rgb = RGBColor(38, 41, 48)
-                    p.space_after = Pt(2)
+                    p.space_after = Pt(4)
 
                 # Section 2: Target Audience Header
                 p_head2 = shape.text_frame.add_paragraph()
@@ -3042,7 +3049,7 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
                 p_head2.font.bold = True
                 p_head2.font.size = Pt(15)
                 p_head2.font.color.rgb = RGBColor(253, 55, 82)
-                p_head2.space_after = Pt(4)
+                p_head2.space_after = Pt(6)
 
                 # 3 Audience Bullets
                 for aud in slide_11_data.get("target_audience", []):
@@ -3050,12 +3057,12 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
                     p.text = f"• {aud}"
                     p.font.size = Pt(13)
                     p.font.color.rgb = RGBColor(38, 41, 48)
-                    p.space_after = Pt(2)
+                    p.space_after = Pt(4)
+                break # Only update once
 
     # --- STEP 3: INSERT THE 5 GAMMA SLIDES WITH PROPORTIONAL SCALING ---
     print(f"  🧬 [Deck Engine] Splicing & auto-scaling {len(prs_gamma.slides)} Gamma slides into Master Deck...", flush=True)
     
-    # Calculate scale ratios to stretch Gamma slides edge-to-edge
     master_w = prs_master.slide_width
     master_h = prs_master.slide_height
     gamma_w = prs_gamma.slide_width
@@ -3064,7 +3071,6 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
     scale_x = master_w / gamma_w if gamma_w else 1.0
     scale_y = master_h / gamma_h if gamma_h else 1.0
 
-    # Locate the blank layout (layout with 0 placeholders)
     blank_layout = None
     for layout in prs_master.slide_layouts:
         if len(layout.placeholders) == 0:
@@ -3079,10 +3085,11 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
     for g_idx, gamma_slide in enumerate(prs_gamma.slides):
         new_slide = prs_master.slides.add_slide(blank_layout)
 
-        # CRITICAL FIX 1: Strip out any default 'Click to add title' placeholder
-        for ph in list(new_slide.placeholders):
-            sp = ph._element
-            sp.getparent().remove(sp)
+        # Strip out any default 'Click to add title' placeholder
+        for shape in list(new_slide.shapes):
+            if shape.is_placeholder:
+                sp = shape._element
+                sp.getparent().remove(sp)
 
         # Copy background color
         if gamma_slide.background and gamma_slide.background.fill:
@@ -3092,7 +3099,7 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
             except Exception:
                 pass
 
-        # CRITICAL FIX 2: Copy shapes with proportional coordinate scaling
+        # Copy shapes with proportional coordinate scaling
         for shape in gamma_slide.shapes:
             scaled_left = int(shape.left * scale_x)
             scaled_top = int(shape.top * scale_y)
@@ -3105,7 +3112,6 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
             else:
                 try:
                     new_shape_elem = copy.deepcopy(shape.element)
-                    # Update XML bounds to scaled coordinates
                     new_shape_elem.spPr.xfrm.off.x = scaled_left
                     new_shape_elem.spPr.xfrm.off.y = scaled_top
                     new_shape_elem.spPr.xfrm.ext.cx = scaled_width
