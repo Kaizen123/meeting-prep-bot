@@ -2960,10 +2960,14 @@ Do not use markdown code blocks (```).
 def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id, gamma_pptx_bytes, brand_name, brief_text, gemini_client, output_folder_id):
     """
     1. Downloads the 23-slide Master Deck from Google Drive.
-    2. Updates Slide 1 (Brand Name) and Slide 11 (Campaign Objectives & Target Audience).
-    3. Slices the 5 Gamma slides and inserts them right between Slide 11 and Slide 12.
-    4. Saves the complete 28-slide deck back to Google Drive and returns the view link.
+    2. Updates Slide 1 Cover with prominent Brand Name next to the 'X' box.
+    3. Updates Slide 11 with full Objectives and Target Audience at readable font sizes.
+    4. Scales Gamma's slides proportionally to match the master widescreen dimensions.
+    5. Strips out default 'Click to add title' placeholders.
+    6. Saves the polished 28-slide deck back to Google Drive.
     """
+    from pptx.dml.color import RGBColor
+
     print(f"  📥 [Deck Engine] Downloading Master Presentation ({master_template_file_id}) from Drive...", flush=True)
     request = drive_service.files().get_media(fileId=master_template_file_id)
     master_stream = io.BytesIO()
@@ -2976,55 +2980,111 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
     prs_master = Presentation(master_stream)
     prs_gamma = Presentation(io.BytesIO(gamma_pptx_bytes))
 
-    # --- STEP 1: UPDATE SLIDE 1 (COVER) ---
+    # --- STEP 1: UPDATE SLIDE 1 (COVER BRAND STAMP) ---
     slide_1 = prs_master.slides[0]
+    brand_stamped = False
+    
+    # First attempt: find any text containing 'X'
     for shape in slide_1.shapes:
-        if shape.has_text_frame:
-            for p in shape.text_frame.paragraphs:
-                for r in p.runs:
-                    if "X" in r.text and len(r.text.strip()) <= 3:
-                        r.text = f"X  {brand_name.upper()}"
+        if shape.has_text_frame and "X" in shape.text_frame.text:
+            text = shape.text_frame.text.strip()
+            if text == "X" or len(text) <= 4:
+                shape.text_frame.text = f"X   {brand_name.upper()}"
+                for p in shape.text_frame.paragraphs:
+                    p.font.bold = True
+                    p.font.size = Pt(24)
+                    p.font.color.rgb = RGBColor(255, 255, 255)
+                brand_stamped = True
+                break
+    
+    # Fallback: add a clean, bold brand text box directly next to the X lockup
+    if not brand_stamped:
+        tx_box = slide_1.shapes.add_textbox(Inches(7.2), Inches(5.8), Inches(5.5), Inches(0.9))
+        tf = tx_box.text_frame
+        tf.word_wrap = True
+        p = tf.paragraphs[0]
+        p.text = brand_name.upper()
+        p.font.bold = True
+        p.font.size = Pt(26)
+        p.font.color.rgb = RGBColor(255, 255, 255)
 
-    # --- STEP 2: UPDATE SLIDE 11 ("HOW CAN WE HELP?") ---
-    print(f"  ✍️ [Deck Engine] Injecting Gemini tailored campaign objectives into Slide 11...", flush=True)
+    # --- STEP 2: UPDATE SLIDE 11 ("HOW CAN WE HELP?") WITH FULL OBJECTIVES & AUDIENCE ---
+    print(f"  ✍️ [Deck Engine] Injecting Gemini tailored campaign objectives & audience into Slide 11...", flush=True)
     slide_11 = prs_master.slides[10] # 0-indexed (Slide 11)
     slide_11_data = update_slide_11_objectives_with_gemini(gemini_client, brand_name, brief_text)
 
     for shape in slide_11.shapes:
         if shape.has_text_frame:
             full_text = shape.text_frame.text
-            if "The primary objective of the campaign" in full_text:
+            if "The primary objective of the campaign" in full_text or "HOW CAN WE HELP" in full_text:
                 shape.text_frame.clear()
-                p_head = shape.text_frame.paragraphs[0]
-                p_head.text = "The primary objective of the campaign:"
-                p_head.font.bold = True
-                p_head.font.size = Pt(14)
-                for obj in slide_11_data["campaign_objectives"]:
+                shape.text_frame.word_wrap = True
+
+                # Section 1: Objectives Header
+                p_head1 = shape.text_frame.paragraphs[0]
+                p_head1.text = "The primary objective of the campaign:"
+                p_head1.font.bold = True
+                p_head1.font.size = Pt(15)
+                p_head1.font.color.rgb = RGBColor(253, 55, 82) # NoBroker Coral Red
+                p_head1.space_after = Pt(4)
+
+                # 5 Objectives Bullets
+                for obj in slide_11_data.get("campaign_objectives", []):
                     p = shape.text_frame.add_paragraph()
                     p.text = f"• {obj}"
-                    p.font.size = Pt(12)
-            elif "TARGET AUDIENCE" in full_text:
-                shape.text_frame.clear()
-                p_head = shape.text_frame.paragraphs[0]
-                p_head.text = "TARGET AUDIENCE"
-                p_head.font.bold = True
-                p_head.font.size = Pt(14)
-                for aud in slide_11_data["target_audience"]:
+                    p.font.size = Pt(13)
+                    p.font.color.rgb = RGBColor(38, 41, 48)
+                    p.space_after = Pt(2)
+
+                # Section 2: Target Audience Header
+                p_head2 = shape.text_frame.add_paragraph()
+                p_head2.text = "\nTARGET AUDIENCE:"
+                p_head2.font.bold = True
+                p_head2.font.size = Pt(15)
+                p_head2.font.color.rgb = RGBColor(253, 55, 82)
+                p_head2.space_after = Pt(4)
+
+                # 3 Audience Bullets
+                for aud in slide_11_data.get("target_audience", []):
                     p = shape.text_frame.add_paragraph()
                     p.text = f"• {aud}"
-                    p.font.size = Pt(12)
+                    p.font.size = Pt(13)
+                    p.font.color.rgb = RGBColor(38, 41, 48)
+                    p.space_after = Pt(2)
 
-    # --- STEP 3: INSERT THE 5 GAMMA SLIDES BETWEEN SLIDE 11 AND SLIDE 12 ---
-    print(f"  🧬 [Deck Engine] Splicing {len(prs_gamma.slides)} Gamma slides into Master Deck...", flush=True)
-    blank_layout = prs_master.slide_layouts[6]
+    # --- STEP 3: INSERT THE 5 GAMMA SLIDES WITH PROPORTIONAL SCALING ---
+    print(f"  🧬 [Deck Engine] Splicing & auto-scaling {len(prs_gamma.slides)} Gamma slides into Master Deck...", flush=True)
+    
+    # Calculate scale ratios to stretch Gamma slides edge-to-edge
+    master_w = prs_master.slide_width
+    master_h = prs_master.slide_height
+    gamma_w = prs_gamma.slide_width
+    gamma_h = prs_gamma.slide_height
+
+    scale_x = master_w / gamma_w if gamma_w else 1.0
+    scale_y = master_h / gamma_h if gamma_h else 1.0
+
+    # Locate the blank layout (layout with 0 placeholders)
+    blank_layout = None
+    for layout in prs_master.slide_layouts:
+        if len(layout.placeholders) == 0:
+            blank_layout = layout
+            break
+    if not blank_layout:
+        blank_layout = prs_master.slide_layouts[-1]
+
     sldIdLst = prs_master.slides._sldIdLst
-
     insert_target_index = 11 # Insert right after Slide 11
 
     for g_idx, gamma_slide in enumerate(prs_gamma.slides):
         new_slide = prs_master.slides.add_slide(blank_layout)
 
-        # Copy background if solid
+        # CRITICAL FIX 1: Strip out any default 'Click to add title' placeholder
+        for ph in list(new_slide.placeholders):
+            sp = ph._element
+            sp.getparent().remove(sp)
+
+        # Copy background color
         if gamma_slide.background and gamma_slide.background.fill:
             try:
                 new_slide.background.fill.solid()
@@ -3032,23 +3092,37 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
             except Exception:
                 pass
 
-        # Copy all shapes, cards, text, and pictures
+        # CRITICAL FIX 2: Copy shapes with proportional coordinate scaling
         for shape in gamma_slide.shapes:
+            scaled_left = int(shape.left * scale_x)
+            scaled_top = int(shape.top * scale_y)
+            scaled_width = int(shape.width * scale_x)
+            scaled_height = int(shape.height * scale_y)
+
             if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
                 img_stream = io.BytesIO(shape.image.blob)
-                new_slide.shapes.add_picture(img_stream, shape.left, shape.top, width=shape.width, height=shape.height)
+                new_slide.shapes.add_picture(img_stream, scaled_left, scaled_top, width=scaled_width, height=scaled_height)
             else:
                 try:
                     new_shape_elem = copy.deepcopy(shape.element)
+                    # Update XML bounds to scaled coordinates
+                    new_shape_elem.spPr.xfrm.off.x = scaled_left
+                    new_shape_elem.spPr.xfrm.off.y = scaled_top
+                    new_shape_elem.spPr.xfrm.ext.cx = scaled_width
+                    new_shape_elem.spPr.xfrm.ext.cy = scaled_height
                     new_slide.shapes._spTree.append(new_shape_elem)
                 except Exception:
-                    pass
+                    try:
+                        new_shape_elem = copy.deepcopy(shape.element)
+                        new_slide.shapes._spTree.append(new_shape_elem)
+                    except Exception:
+                        pass
 
-        # Move the newly added slide from the end of the presentation to index (11 + g_idx)
+        # Move the slide into place (between Slide 11 and Slide 12)
         new_slide_element = sldIdLst[-1]
         sldIdLst.insert(insert_target_index + g_idx, new_slide_element)
 
-    # --- STEP 4: SAVE THE COMPLETE 28-SLIDE DECK TO GOOGLE DRIVE ---
+    # --- STEP 4: SAVE THE POLISHED 28-SLIDE DECK TO GOOGLE DRIVE ---
     print(f"  ☁️ [Deck Engine] Saving customized 28-slide presentation to Google Drive...", flush=True)
     out_stream = io.BytesIO()
     prs_master.save(out_stream)
@@ -3063,10 +3137,9 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
     media = MediaIoBaseUpload(out_stream, mimetype='application/vnd.openxmlformats-officedocument.presentationml.presentation', resumable=True)
 
     uploaded_deck = drive_service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink, webContentLink').execute()
-
     view_url = uploaded_deck.get('webViewLink')
 
-    # Set public viewer permission ('reader' is the valid Google Drive v3 role)
+    # Set public viewer permission ('reader')
     try:
         drive_service.permissions().create(
             fileId=uploaded_deck['id'], 
