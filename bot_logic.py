@@ -2965,14 +2965,15 @@ Do not use markdown code fences (```).
         return f"# Partnership Proposal: NoBrokerHood × {brand_name}\nHyperlocal Monetization"
 
 
-def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id, gamma_pptx_bytes, brand_name, brief_text, gemini_client, output_folder_id):
+def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id, gamma_pptx_bytes, brand_name, brief_text, gemini_client, output_folder_id, creative_image_bytes=None):
     """
     1. Downloads the 23-slide Master Deck from Google Drive.
-    2. Accurately anchors Brand Name on Slide 1 next to the 'X' box.
-    3. Updates Slide 11 Body (exactly once) with generous font sizes and paragraph spacing.
-    4. Scales Gamma's 5 proposal slides to 16:9 widescreen dimensions.
-    5. Strips out default 'Click to add title' placeholders.
-    6. Saves the polished 28-slide deck back to Google Drive.
+    2. Updates Slide 1 Cover: 'Times New Roman', Italic, 46pt placed accurately inside the client box.
+    3. Updates Slide 11: Title = 42pt, Red Headers = 28pt, Black Content = 26pt.
+    4. Inserts Slide 12 (NEW): Full-slide showcase of the 3-panel Creative Mockup (Gate + Lift + App).
+    5. Slices the 5 Gamma slides (Slides 13–17) with proportional 16:9 widescreen scaling.
+    6. Appends the remaining master slides (Slides 18–29).
+    7. Saves the finalized presentation to Google Drive.
     """
     from pptx.dml.color import RGBColor
 
@@ -2988,89 +2989,89 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
     prs_master = Presentation(master_stream)
     prs_gamma = Presentation(io.BytesIO(gamma_pptx_bytes))
 
-    # --- STEP 1: UPDATE SLIDE 1 (COVER BRAND STAMP) ---
+    # --- STEP 1: UPDATE SLIDE 1 (COVER BRAND STAMP: TIMES NEW ROMAN, ITALIC, 46PT) ---
     slide_1 = prs_master.slides[0]
     
-    # Locate the subtitle shape to get the exact horizontal and vertical anchor
-    anchor_left = Inches(9.8)
-    anchor_top = Inches(4.3)
+    # Locate the target position by finding the white box next to X
+    brand_left = Inches(10.2)
+    brand_top = Inches(4.1)
     for shape in slide_1.shapes:
         if shape.has_text_frame and "TRANSFORMING COMMUNITIES" in shape.text_frame.text.upper():
-            anchor_left = shape.left + Inches(1.8)
-            anchor_top = shape.top - Inches(1.0)
+            brand_left = shape.left + Inches(2.2)
+            brand_top = shape.top - Inches(1.3)
             break
 
-    # Add a clean, bold brand text box right next to the white X badge
-    tx_box = slide_1.shapes.add_textbox(anchor_left, anchor_top, Inches(4.5), Inches(0.8))
+    # Add the brand text box with the requested styling
+    tx_box = slide_1.shapes.add_textbox(brand_left, brand_top, Inches(4.8), Inches(1.2))
     tf = tx_box.text_frame
     tf.word_wrap = True
     p = tf.paragraphs[0]
-    p.text = brand_name.upper()
+    p.text = brand_name.title()
+    p.font.name = "Times New Roman"
+    p.font.italic = True
     p.font.bold = True
-    p.font.size = Pt(24)
-    p.font.color.rgb = RGBColor(255, 255, 255) # Pure White
+    p.font.size = Pt(46)
+    p.font.color.rgb = RGBColor(253, 55, 82) # NoBroker Coral Red (visible on white box)
 
-    # --- STEP 2: UPDATE SLIDE 11 ("HOW CAN WE HELP?") ---
-    print(f"  ✍️ [Deck Engine] Injecting Gemini tailored campaign objectives & audience into Slide 11...", flush=True)
+    # --- STEP 2: UPDATE SLIDE 11 (TITLE: 42PT, RED HEADERS: 28PT, BLACK CONTENT: 26PT) ---
+    print(f"  ✍️ [Deck Engine] Formatting Slide 11 (Title: 42pt, Headers: 28pt, Bullets: 26pt)...", flush=True)
     slide_11 = prs_master.slides[10] # 0-indexed (Slide 11)
     slide_11_data = update_slide_11_objectives_with_gemini(gemini_client, brand_name, brief_text)
 
     for shape in slide_11.shapes:
         if shape.has_text_frame:
-            full_text = shape.text_frame.text
-            # CRITICAL: Match ONLY the body box, NEVER match 'HOW CAN WE HELP' to avoid duplicate text
-            if "The primary objective of the campaign" in full_text and "HOW CAN WE HELP" not in full_text:
+            full_text = shape.text_frame.text.strip()
+
+            # Format Main Title ("HOW CAN WE HELP?") to 42pt
+            if "HOW CAN WE HELP" in full_text.upper():
+                shape.text_frame.paragraphs[0].font.size = Pt(42)
+                shape.text_frame.paragraphs[0].font.bold = True
+                shape.text_frame.paragraphs[0].font.color.rgb = RGBColor(253, 55, 82)
+
+            # Format Body Text Frame (Objectives & Target Audience)
+            elif "The primary objective of the campaign" in full_text:
                 shape.text_frame.clear()
                 shape.text_frame.word_wrap = True
                 
-                # Make box slightly wider and taller to display text comfortably
-                shape.width = Inches(8.5)
-                shape.height = Inches(4.8)
+                # Expand box bounds to fit 26pt and 28pt fonts comfortably
+                shape.left = Inches(1.0)
+                shape.top = Inches(1.8)
+                shape.width = Inches(11.3)
+                shape.height = Inches(5.4)
 
-                # Section 1: Objectives Header
+                # 1. Objectives Red Header (28pt)
                 p_head1 = shape.text_frame.paragraphs[0]
                 p_head1.text = "The primary objective of the campaign:"
                 p_head1.font.bold = True
-                p_head1.font.size = Pt(15)
-                p_head1.font.color.rgb = RGBColor(253, 55, 82) # NoBroker Coral Red
-                p_head1.space_after = Pt(6)
+                p_head1.font.size = Pt(28)
+                p_head1.font.color.rgb = RGBColor(253, 55, 82)
+                p_head1.space_after = Pt(4)
 
-                # 5 Objectives Bullets
+                # 5 Objectives Black Bullets (26pt)
                 for obj in slide_11_data.get("campaign_objectives", []):
                     p = shape.text_frame.add_paragraph()
                     p.text = f"• {obj}"
-                    p.font.size = Pt(13)
+                    p.font.size = Pt(26)
                     p.font.color.rgb = RGBColor(38, 41, 48)
-                    p.space_after = Pt(4)
+                    p.space_after = Pt(3)
 
-                # Section 2: Target Audience Header
+                # 2. Target Audience Red Header (28pt)
                 p_head2 = shape.text_frame.add_paragraph()
                 p_head2.text = "\nTARGET AUDIENCE:"
                 p_head2.font.bold = True
-                p_head2.font.size = Pt(15)
+                p_head2.font.size = Pt(28)
                 p_head2.font.color.rgb = RGBColor(253, 55, 82)
-                p_head2.space_after = Pt(6)
+                p_head2.space_after = Pt(4)
 
-                # 3 Audience Bullets
+                # 3 Audience Black Bullets (26pt)
                 for aud in slide_11_data.get("target_audience", []):
                     p = shape.text_frame.add_paragraph()
                     p.text = f"• {aud}"
-                    p.font.size = Pt(13)
+                    p.font.size = Pt(26)
                     p.font.color.rgb = RGBColor(38, 41, 48)
-                    p.space_after = Pt(4)
-                break # Only update once
+                    p.space_after = Pt(3)
 
-    # --- STEP 3: INSERT THE 5 GAMMA SLIDES WITH PROPORTIONAL SCALING ---
-    print(f"  🧬 [Deck Engine] Splicing & auto-scaling {len(prs_gamma.slides)} Gamma slides into Master Deck...", flush=True)
-    
-    master_w = prs_master.slide_width
-    master_h = prs_master.slide_height
-    gamma_w = prs_gamma.slide_width
-    gamma_h = prs_gamma.slide_height
-
-    scale_x = master_w / gamma_w if gamma_w else 1.0
-    scale_y = master_h / gamma_h if gamma_h else 1.0
-
+    # Locate a blank layout with 0 placeholders
     blank_layout = None
     for layout in prs_master.slide_layouts:
         if len(layout.placeholders) == 0:
@@ -3080,18 +3081,55 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
         blank_layout = prs_master.slide_layouts[-1]
 
     sldIdLst = prs_master.slides._sldIdLst
-    insert_target_index = 11 # Insert right after Slide 11
+
+    # --- STEP 3: INSERT SLIDE 12 (NEW SLIDE: DEDICATED 3-PANEL MOCKUP SHOWCASE) ---
+    current_insertion_index = 11 # Right after Slide 11
+    if creative_image_bytes:
+        print(f"  🖼️ [Deck Engine] Inserting Slide 12: Dedicated 3-Panel Creative Mockup...", flush=True)
+        mockup_slide = prs_master.slides.add_slide(blank_layout)
+        
+        # Remove any default placeholders
+        for shape in list(mockup_slide.shapes):
+            if shape.is_placeholder:
+                sp = shape._element
+                sp.getparent().remove(sp)
+
+        # Embed the generated 3-panel image scaled to fill the widescreen slide
+        img_stream = io.BytesIO(creative_image_bytes)
+        mockup_slide.shapes.add_picture(
+            img_stream, 
+            Inches(0.4), 
+            Inches(0.4), 
+            width=Inches(12.5), 
+            height=Inches(6.7)
+        )
+
+        # Move to position 11 (Slide 12)
+        slide_elem = sldIdLst[-1]
+        sldIdLst.insert(current_insertion_index, slide_elem)
+        current_insertion_index += 1 # Shift Gamma slides to begin at index 12 (Slide 13)
+
+    # --- STEP 4: INSERT THE 5 GAMMA SLIDES WITH PROPORTIONAL SCALING ---
+    print(f"  🧬 [Deck Engine] Splicing & auto-scaling {len(prs_gamma.slides)} Gamma slides...", flush=True)
+    
+    master_w = prs_master.slide_width
+    master_h = prs_master.slide_height
+    gamma_w = prs_gamma.slide_width
+    gamma_h = prs_gamma.slide_height
+
+    scale_x = master_w / gamma_w if gamma_w else 1.0
+    scale_y = master_h / gamma_h if gamma_h else 1.0
 
     for g_idx, gamma_slide in enumerate(prs_gamma.slides):
         new_slide = prs_master.slides.add_slide(blank_layout)
 
-        # Strip out any default 'Click to add title' placeholder
+        # Remove default placeholders
         for shape in list(new_slide.shapes):
             if shape.is_placeholder:
                 sp = shape._element
                 sp.getparent().remove(sp)
 
-        # Copy background color
+        # Copy background
         if gamma_slide.background and gamma_slide.background.fill:
             try:
                 new_slide.background.fill.solid()
@@ -3124,12 +3162,12 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
                     except Exception:
                         pass
 
-        # Move the slide into place (between Slide 11 and Slide 12)
+        # Move slide into place (Slides 13–17)
         new_slide_element = sldIdLst[-1]
-        sldIdLst.insert(insert_target_index + g_idx, new_slide_element)
+        sldIdLst.insert(current_insertion_index + g_idx, new_slide_element)
 
-    # --- STEP 4: SAVE THE POLISHED 28-SLIDE DECK TO GOOGLE DRIVE ---
-    print(f"  ☁️ [Deck Engine] Saving customized 28-slide presentation to Google Drive...", flush=True)
+    # --- STEP 5: SAVE THE POLISHED 29-SLIDE DECK TO GOOGLE DRIVE ---
+    print(f"  ☁️ [Deck Engine] Saving customized presentation to Google Drive...", flush=True)
     out_stream = io.BytesIO()
     prs_master.save(out_stream)
     out_stream.seek(0)
@@ -3154,7 +3192,7 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
     except Exception as perm_err:
         print(f"  ⚠️ Note on drive permissions: {perm_err}", flush=True)
 
-    print(f"  ✅ [Deck Engine] 28-Slide Presentation Ready! Drive Link: {view_url}", flush=True)
+    print(f"  ✅ [Deck Engine] 29-Slide Presentation Ready! Drive Link: {view_url}", flush=True)
     return {
         "gamma_url": view_url,
         "pptx_download_url": view_url
@@ -3251,7 +3289,8 @@ def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client, creative_im
             brand_name=brand_name,
             brief_text=brief_text,
             gemini_client=gemini_client,
-            output_folder_id=output_folder_id
+            output_folder_id=output_folder_id,
+            creative_image_bytes=creative_image_bytes  # <--- PASSES IMAGE BYTES FOR SLIDE 12
         )
 
     except Exception as e:
