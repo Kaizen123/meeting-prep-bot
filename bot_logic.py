@@ -2889,9 +2889,11 @@ Return ONLY a JSON object:
 
 def prepare_gamma_5_cards_with_gemini(gemini_client, brand_name, brief_text, custom_mockup_url=None):
     """
-    Acts as Senior Brand Partnerships Strategist at NoBrokerHood.
-    Deep-mines the Pre-Meeting Brief, verified market news, and creative hook to write
-    5 bespoke, data-rich presentation cards for Gamma with comparison tables and micro-market targets.
+    Acts as VP of Brand Partnerships & Creative Director at NoBrokerHood.
+    Deep-mines the Pre-Meeting Brief, verified news, creative hooks, AND real
+    executed campaigns and case studies (Sections 4 & 5).
+    Synthesizes this data into 7 high-impact, presentation-grade narrative cards
+    designed specifically for Gamma's AI visual layouts (cards, grids, and metrics).
     """
     if not gemini_client or not brief_text:
         return f"# Partnership Proposal: NoBrokerHood × {brand_name}\nHyperlocal Resident Monetization"
@@ -2905,10 +2907,10 @@ Embed this EXACT live customized ad mockup on Slide 3 showing {brand_name}'s liv
 """
 
     prompt = f"""
-You are the Head of Brand Partnerships & Ad Sales at NoBrokerHood (NBH).
+You are the Head of Brand Partnerships & Executive Pitch Strategist at NoBrokerHood (NBH).
 You are preparing an executive sales presentation to pitch NoBrokerHood's advertising ecosystem to '{brand_name}'.
 
-Here is the full Pre-Meeting Intelligence Brief for '{brand_name}' (including verified news, active campaigns, target demographics, and pain points):
+Here is the full Pre-Meeting Intelligence Brief for '{brand_name}' (including verified news, active campaigns, demographics, and real executed peer campaigns):
 ---
 {brief_text}
 ---
@@ -2916,13 +2918,21 @@ Here is the full Pre-Meeting Intelligence Brief for '{brand_name}' (including ve
 {mockup_instruction}
 
 IMPORTANT CONTEXT:
-The presentation already contains 23 static slides covering NoBrokerHood's general scale, app formats, and past company case studies.
-Therefore, DO NOT explain basic NoBrokerHood features in these 5 slides.
-Instead, write an ELITE, BRAND-SPECIFIC PROPOSAL tailored exclusively to {brand_name}.
+The presentation already contains 23 static slides covering NoBrokerHood's scale and general ecosystem.
+DO NOT create generic filler slides. 
+Create an ELITE, BRAND-SPECIFIC PROPOSAL tailored exclusively to {brand_name}.
+
+CRITICAL INSTRUCTIONS FOR SLIDES 6 & 7 (PROVEN WORK & CASE STUDIES):
+- Examine Section 4 ("Recent Campaign Examples") and Section 5 ("Proven Case Studies") in the brief.
+- Extract the REAL brand names, cities, and execution formats (e.g. EuroKids, Kidz Crayon, Jamboree, or other peer brands logged).
+- DO NOT just dump raw logs, dates, or timestamps into the slides!
+- Transform this data into compelling, presentation-grade storytelling:
+  * Slide 6: Present it as a "Validated Category Playbook" showing how peer brands unlocked neighborhood trust.
+  * Slide 7: Present it as an executive "Challenge ➔ Intervention ➔ Quantifiable Impact" ROI study with bold performance metrics.
 
 SLIDE BLUEPRINT:
 # Slide 1: The Hyperlocal Opportunity for {brand_name}
-- Reference their exact current market campaign, flagship sale, or active product push found in the brief (e.g. festive sales, new variant launches, quick-commerce expansion).
+- Reference their exact current market campaign, flagship push, or active product launch found in the brief.
 - Contrast the challenges of open-web digital ads (high CAC, 40%+ ad fatigue, cluttered social feeds) with gated community residents.
 - Why gated societies represent the highest concentration of {brand_name}'s power buyers in Tier-1 India.
 
@@ -2953,7 +2963,24 @@ Create a clean Markdown table targeting {brand_name}'s core urban consumer base 
   * Measurable conversion via exclusive community coupon codes and doorstep trial tracking.
 - Next Steps: Immediate society inventory lock-in and customized micro-market pricing.
 
-Format strictly as clean Markdown with `# Slide Title`, clear bullet points, and the table on Slide 4.
+# Slide 6: Proven In-Community Playbook: Peer Brand Executions in Your Category
+- Frame this as real-world market proof using the actual brands and cities from Section 4 of the brief:
+  * **Brand Familiarity & Daily Transit Touchpoints**: How peer brands (referencing actual names from Section 4) dominated the elevator dwell time in A+ gated societies.
+  * **High-Intent Domestic Moments**: Capturing decision-makers at home during calm evening transit rather than on cluttered digital feeds.
+  * **Precision Society Clustered Reach**: Hyperlocal locking of societies within a 3–5 km radius of target hubs to eliminate wasted impressions.
+- Conclude with a strong pitch takeaway: *"A field-tested playbook refined across Tier-1 metros, delivering high-affinity neighborhood recall."*
+
+# Slide 7: Demonstrated Resident ROI: Real Business Outcomes & Benchmarks
+- Format as an executive Impact Study drawing from Section 5 of the brief:
+  * **The Challenge Solved**: Overcoming digital ad blindness and sky-high customer acquisition costs.
+  * **The Hyperlocal Advantage**: Direct, uncluttered physical and digital presence inside verified affluent residential communities.
+- Highlight 3 Key Performance Benchmarks:
+  * **45-Second Captive Dwell Time**: Undivided transit attention inside passenger elevators vs 1.5-second feed scrolls.
+  * **100% Verified Residential Reach**: Zero bot traffic, zero fraudulent clicks, verified residential households.
+  * **2.8× Higher Brand Recall**: Consistent ambient daily presence driving peer recommendations in resident community circles.
+- Conclude with: *"Why Partner With NBH: We have successfully delivered verified resident engagement for your industry peers. We are ready to replicate this performance for {brand_name}."*
+
+Format strictly as clean Markdown with `# Slide Title`, clear bullet points, bold key terms, and the table on Slide 4.
 Do not use markdown code fences (```).
 """
     try:
@@ -2961,7 +2988,7 @@ Do not use markdown code fences (```).
         response = gemini_client.models.generate_content(model="gemini-2.5-flash", contents=prompt, config=config)
         return response.text.strip()
     except Exception as e:
-        print(f"  ⚠️ Error generating Gamma 5 cards via Gemini: {e}", flush=True)
+        print(f"  ⚠️ Error generating Gamma cards via Gemini: {e}", flush=True)
         return f"# Partnership Proposal: NoBrokerHood × {brand_name}\nHyperlocal Monetization"
 
 
@@ -2971,7 +2998,7 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
     2. Updates Slide 1 Cover: Times New Roman, Italic, 46pt, Pure White, positioned next to 'X'.
     3. Updates Slide 11: Main Title = 42pt (Centered), Red Headers = 28pt (Centered), Black Bullets = 26pt (Centered).
     4. Populates Slide 12: Uses existing blank template Slide 12 (with logo) and centers the 3-panel mockup image.
-    5. Inserts Gamma Slides 13–17 with custom typography and proportional 16:9 scaling.
+    5. Inserts Gamma Slides 13–19 (7 slides: Strategy + Campaigns + Case Studies) with proportional 16:9 scaling.
     6. Saves the finalized presentation to Google Drive.
     """
     from pptx.dml.color import RGBColor
@@ -2992,7 +3019,6 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
     # --- STEP 1: SLIDE 1 (COVER BRAND STAMP: TIMES NEW ROMAN, ITALIC, 46PT, PURE WHITE) ---
     slide_1 = prs_master.slides[0]
     
-    # Position: Directly to the right of 'X' on Slide 1
     brand_left = Inches(9.3)
     brand_top = Inches(5.6)
 
@@ -3030,7 +3056,6 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
                 shape.text_frame.clear()
                 shape.text_frame.word_wrap = True
                 
-                # Center the box horizontally across the slide
                 shape.left = Inches(0.9)
                 shape.top = Inches(1.7)
                 shape.width = Inches(11.5)
@@ -3077,13 +3102,11 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
         print(f"  🖼️ [Deck Engine] Populating existing Slide 12 with centered 3-panel creative mockup...", flush=True)
         slide_12 = prs_master.slides[11] # 0-indexed (Slide 12 in template)
         
-        # Remove any unwanted default placeholders
         for shape in list(slide_12.shapes):
             if shape.is_placeholder:
                 sp = shape._element
                 sp.getparent().remove(sp)
 
-        # Center image horizontally and vertically
         img_stream = io.BytesIO(creative_image_bytes)
         img_width = Inches(11.5)
         img_height = Inches(5.8)
@@ -3092,8 +3115,8 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
 
         slide_12.shapes.add_picture(img_stream, img_left, img_top, width=img_width, height=img_height)
 
-    # --- STEP 4: INSERT & STYLE GAMMA SLIDES (SLIDES 13 TO 17) ---
-    print(f"  🧬 [Deck Engine] Splicing & precision-styling Gamma slides 13 to 17...", flush=True)
+    # --- STEP 4: INSERT & STYLE GAMMA SLIDES (SLIDES 13 TO 19) ---
+    print(f"  🧬 [Deck Engine] Splicing & precision-styling Gamma slides (7 cards: Strategy + Campaigns + Case Studies)...", flush=True)
     
     master_w = prs_master.slide_width
     master_h = prs_master.slide_height
@@ -3158,7 +3181,6 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
 
         # Apply specific typographic rules
         for shape in new_slide.shapes:
-            # Handle text shapes
             if shape.has_text_frame:
                 for p in shape.text_frame.paragraphs:
                     p_text = p.text.strip()
@@ -3201,17 +3223,28 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
                         else:
                             p.font.size = Pt(22.5)
 
-            # Handle Slide 16 Table styling
-            if shape.has_table and g_idx == 3:
+                    # Slides 18 & 19 (Proven Playbook & Case Studies) styling
+                    elif g_idx in [5, 6]:
+                        if any(c in p_text.lower() for c in ["proven in-community", "peer brand executions", "demonstrated resident roi", "case studies", "resident outcomes"]):
+                            p.font.size = Pt(34)
+                            p.font.bold = True
+                        elif p.font.bold:
+                            p.font.size = Pt(24)
+                        else:
+                            p.font.size = Pt(20)
+
+            # Handle Tables for Slide 16, 18 or 19
+            if shape.has_table and g_idx in [3, 5, 6]:
                 table = shape.table
-                for row in table.rows:
+                for r_i, row in enumerate(table.rows):
                     for cell in row.cells:
                         for cp in cell.text_frame.paragraphs:
                             cp.alignment = PP_ALIGN.CENTER
-                            cp.font.size = Pt(22.5)
-                            cp.font.bold = True
+                            cp.font.size = Pt(20)
+                            if r_i == 0:
+                                cp.font.bold = True
 
-        # Move the slide into place (Slides 13–17)
+        # Move the slide into place (Slides 13–19)
         new_slide_element = sldIdLst[-1]
         sldIdLst.insert(gamma_insertion_start + g_idx, new_slide_element)
 
@@ -3232,7 +3265,6 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
     uploaded_deck = drive_service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink, webContentLink').execute()
     view_url = uploaded_deck.get('webViewLink')
 
-    # Grant viewer permission ('reader')
     try:
         drive_service.permissions().create(
             fileId=uploaded_deck['id'], 
@@ -3250,9 +3282,9 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
 
 def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client, creative_image_bytes=None, event_id="", drive_service=None, output_folder_id="1RhhsFq5NGC2QtHPj8FQaU5BfhxJR5R6I"):
     """
-    1. Generates 5 tailored cards via Gamma API with custom creative mockup.
+    1. Generates 7 tailored cards via Gamma API (5 strategic + 2 real campaigns/case studies).
     2. Downloads Gamma's output PPTX.
-    3. Splices them into your 23-slide Master Deck between Slide 11 and Slide 12.
+    3. Splices them into your 23-slide Master Deck between Slide 12 and Slide 13.
     """
     if not GAMMA_API_KEY:
         print("  ⚠️ [GAMMA] GAMMA_API_KEY is not set. Skipping PPT generation.", flush=True)
@@ -3262,7 +3294,7 @@ def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client, creative_im
     if creative_image_bytes:
         custom_mockup_url = upload_creative_to_gcs(creative_image_bytes, brand_name, event_id)
 
-    print(f"  📊 [GAMMA] Deep-mining brief to write 5 bespoke pitch cards for '{brand_name}'...", flush=True)
+    print(f"  📊 [GAMMA] Deep-mining brief to write 7 bespoke pitch cards for '{brand_name}'...", flush=True)
     deck_markdown = prepare_gamma_5_cards_with_gemini(
         gemini_client=gemini_client,
         brand_name=brand_name,
@@ -3279,7 +3311,7 @@ def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client, creative_im
         "inputText": deck_markdown,
         "textMode": "generate",
         "format": "presentation",
-        "numCards": 5,
+        "numCards": 7,
         "exportAs": "pptx"
     }
 
@@ -3304,9 +3336,8 @@ def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client, creative_im
         generation_id = response.json().get("generationId")
         poll_url = f"https://public-api.gamma.app/v1.0/generations/{generation_id}"
 
-        # Poll status until PPTX export is ready
         gamma_pptx_url = None
-        for attempt in range(15):
+        for attempt in range(18):
             time.sleep(4)
             try:
                 poll_resp = requests.get(poll_url, headers=headers, timeout=10)
@@ -3316,7 +3347,7 @@ def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client, creative_im
 
                     if status in ["completed", "complete", "done", "success"]:
                         gamma_pptx_url = poll_data.get("exportUrl")
-                        print(f"  ✅ [GAMMA] 5 dynamic slides ready! Fetching PPTX bytes...", flush=True)
+                        print(f"  ✅ [GAMMA] 7 dynamic slides ready! Fetching PPTX bytes...", flush=True)
                         break
                     elif status in ["failed", "error"]:
                         return None
@@ -3327,10 +3358,8 @@ def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client, creative_im
             print("  ⚠️ [GAMMA] Export URL not ready in time.", flush=True)
             return None
 
-        # Download the 5 Gamma slides into memory
         gamma_pptx_bytes = requests.get(gamma_pptx_url, timeout=30).content
 
-        # Splice into your 23-slide Master Deck
         return splice_gamma_slides_into_master_deck(
             drive_service=drive_service,
             master_template_file_id=NBH_MASTER_TEMPLATE_FILE_ID,
@@ -3339,7 +3368,7 @@ def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client, creative_im
             brief_text=brief_text,
             gemini_client=gemini_client,
             output_folder_id=output_folder_id,
-            creative_image_bytes=creative_image_bytes  # <--- PASSES IMAGE BYTES FOR SLIDE 12
+            creative_image_bytes=creative_image_bytes
         )
 
     except Exception as e:
