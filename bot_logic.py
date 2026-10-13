@@ -1995,10 +1995,11 @@ def get_brand_visual_context(gemini_client, brand_name, industry, generated_brie
 
 def generate_creative_with_gemini_image(gemini_client, brand_name, industry, visual_context):
     """
-    Generates a professional 3-panel side-by-side marketing funnel mockup collage.
-    - Panel 1 and Panel 2 retain strictly static, brand-agnostic marketing funnel captions.
-    - Panel 3 applies dynamic captions specific to the brand's industry and conversion goal.
-    Uses the direct Gemini API paid model for execution.
+    Generates a professional 3-panel side-by-side marketing funnel mockup collage:
+    - Panel 1: Outdoor Residential Gateway (Awareness)
+    - Panel 2: Captive Elevator Cabin (Recall)
+    - Panel 3: Native Mobile In-App Placement (Conversion)
+    Powered by Gemini Nano Banana 2.1 (gemini-nano-banana-2.1) for high-efficiency image generation.
     """
     if not visual_context:
         print(f"  Skipping image generation for {brand_name}: Visual context was not extracted.")
@@ -2075,10 +2076,10 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
       "{caption_p3}"
     """
     
-    print(f"  🎨 Generating image using primary Gemini API model 'gemini-3-pro-image-preview'...")
+    print(f"  🎨 Generating image using Gemini model 'gemini-nano-banana-2.1'...")
     try:
         response = gemini_client.models.generate_content(
-            model="gemini-3-pro-image-preview",
+            model="gemini-nano-banana-2.1",
             contents=image_prompt,
             config=types.GenerateContentConfig(
                 response_modalities=["IMAGE", "TEXT"]
@@ -2096,11 +2097,11 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
                         if not raw_data.startswith(b'\xff\xd8\xff'):
                             raw_data = base64.b64decode(raw_data)
                     
-                    print(f"  ✅ Primary API image generation successful for {brand_name}.")
+                    print(f"  ✅ Gemini Nano Banana 2.1 image generation successful for {brand_name}.")
                     return raw_data
 
     except Exception as api_err:
-        print(f"  ⚠️ Primary API generation failed: {api_err}")
+        print(f"  ⚠️ Gemini Nano Banana 2.1 image generation failed: {api_err}")
 
     return None
 # --- Email Sending ---
