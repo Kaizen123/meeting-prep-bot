@@ -1439,55 +1439,112 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
         campaign_entries.append("**Broad Industry Fallbacks (Low Relevance - Match ONLY if product category is identical):**")
         campaign_entries += matches_ind_p + matches_ind_o
 
-    # 2. READ CASE STUDIES FROM BIGQUERY NATIVE TABLE
+    # 2. READ CASE STUDIES DIRECTLY FROM CONSOLIDATED MASTER SHEET (LATEST DATES FIRST)
     cs_brand_p, cs_brand_o = [], []
     cs_sub_p, cs_sub_o = [], []
     cs_ind_p, cs_ind_o = [], []
 
     try:
-        cs_sql = f"SELECT * FROM `{BQ_PROJECT_ID}.nbh_intelligence.case_studies` LIMIT 250"
-        cs_rows = list(bq_client.query(cs_sql, location="us-central1").result())
+        CASE_STUDIES_MASTER_ID = "1931TAKD1jWI7Cmhboadni_7aIaPNirAT-YKUNgB0ikg"
         
-        for r in cs_rows:
-            row_map = {str(k).lower(): v for k, v in dict(r.items()).items()}
+        # Check in-memory cache to read only once per bot execution
+        if "master_case_studies_rows" not in GDRIVE_FILE_CACHE:
+            print("  📊 [Case Studies] Fetching live rows from 'Consolidated Case Studies - Master' sheet...")
+            sheet_resp = sheets_service.spreadsheets().values().get(
+                spreadsheetId=CASE_STUDIES_MASTER_ID,
+                range="'Main Sheet'!A1:J700"
+            ).execute()
+            GDRIVE_FILE_CACHE["master_case_studies_rows"] = sheet_resp.get('values', [])
+            print(f"  ✅ [Case Studies] Successfully loaded {len(GDRIVE_FILE_CACHE['master_case_studies_rows'])} rows.")
+        
+        cs_all_rows = GDRIVE_FILE_CACHE.get("master_case_studies_rows", [])
 
-            c_brand = get_val(row_map, ["brand", "company"])
-            c_city = get_val(row_map, ["city"]).lower()
-            c_type = get_val(row_map, ["asset", "type", "campaign"])
-            c_obj = get_val(row_map, ["objective", "remark", "detail", "result"])
-            c_sub = get_val(row_map, ["sub"]).lower()
-            c_ind = get_val(row_map, ["industry", "vertical"]).lower()
+        if cs_all_rows and len(cs_all_rows) > 1:
+            cs_headers = [str(h).strip().lower() for h in cs_all_rows[0]]
+            cs_data = cs_all_rows[1:]
 
-            if not c_brand or c_brand.lower() in ['unknown', 'none', 'nan']:
-                continue
+            # Column position mapping
+            b_idx = cs_headers.index("brand name") if "brand name" in cs_headers else 0
+            ind_idx = cs_headers.index("industry") if "industry" in cs_headers else 1
+            sub_idx = cs_headers.index("sub_category") if "sub_category" in cs_headers else 2
+            date_idx = cs_headers.index("date") if "date" in cs_headers else 3
+            camp_idx = cs_headers.index("campaign name") if "campaign name" in cs_headers else 4
+            city_idx = cs_headers.index("targeted city") if "targeted city" in cs_headers else 5
+            asset_idx = cs_headers.index("asset type") if "asset type" in cs_headers else 7
+            detail_idx = cs_headers.index("targeting detail:") if "targeting detail:" in cs_headers else 8
+            type_idx = cs_headers.index("campaign type") if "campaign type" in cs_headers else 9
 
-            is_city_match = target_cities and c_city and any(tc in c_city for tc in target_cities)
-            tag = " [📍 SAME CITY MATCH]" if is_city_match else ""
-            is_priority = bool(is_city_match)
+            # Helper: Turn "September 2026" or "April 2026" into a sortable tuple (2026, 9)
+            month_map = {
+                "january": 1, "jan": 1, "february": 2, "feb": 2, "march": 3, "mar": 3,
+                "april": 4, "apr": 4, "may": 5, "june": 6, "jun": 6, "july": 7, "jul": 7,
+                "august": 8, "aug": 8, "september": 9, "sep": 9, "october": 10, "oct": 10,
+                "november": 11, "nov": 11, "december": 12, "dec": 12
+            }
 
-            type_display = c_type if c_type else "Case Study"
-            obj_display = f" - {c_obj}" if c_obj else ""
-            entry = f"- {c_brand} ({c_city.title() if c_city else 'National'}): {type_display}{obj_display}{tag}"
-            entry_lower = entry.lower()
+            def get_date_sort_tuple(row_item):
+                d_str = str(row_item[date_idx]).strip().lower() if len(row_item) > date_idx else ""
+                y_match = re.search(r'\b(202[3-9])\b', d_str)
+                yr = int(y_match.group(1)) if y_match else 0
+                mo = 0
+                for m_k, m_v in month_map.items():
+                    if m_k in d_str:
+                        mo = m_v
+                        break
+                return (yr, mo)
 
-            if brand_clean and len(brand_clean) > 2 and (brand_clean in c_brand.lower() or c_brand.lower() in brand_clean):
-                if is_priority and len(cs_brand_p) < 4:
-                    cs_brand_p.append(entry)
-                elif not is_priority and len(cs_brand_o) < 4:
-                    cs_brand_o.append(entry)
-            elif sub_category_keywords and (any(k in c_sub for k in sub_category_keywords) or any(k in entry_lower for k in sub_category_keywords)):
-                if is_priority and len(cs_sub_p) < 6:
-                    cs_sub_p.append(entry)
-                elif not is_priority and len(cs_sub_o) < 6:
-                    cs_sub_o.append(entry)
-            elif strict_keywords and (any(k in c_ind for k in strict_keywords) or any(k in entry_lower for k in strict_keywords)):
-                if is_priority and len(cs_ind_p) < 6:
-                    cs_ind_p.append(entry)
-                elif not is_priority and len(cs_ind_o) < 6:
-                    cs_ind_o.append(entry)
+            # Sort rows so NEWEST dates come FIRST
+            sorted_cs_data = sorted(cs_data, key=get_date_sort_tuple, reverse=True)
+
+            valid_sub_kws = [k.strip().lower() for k in sub_category_keywords if k and len(k.strip()) > 2]
+            valid_ind_kws = [k.strip().lower() for k in strict_keywords if k and len(k.strip()) > 2]
+
+            for r in sorted_cs_data:
+                c_brand = str(r[b_idx]).strip() if len(r) > b_idx else ""
+                if not c_brand or c_brand.lower() in ['unknown', 'none', 'nan', '']:
+                    continue
+
+                c_ind = str(r[ind_idx]).strip().lower() if len(r) > ind_idx else ""
+                c_sub = str(r[sub_idx]).strip().lower() if len(r) > sub_idx else ""
+                c_date = str(r[date_idx]).strip() if len(r) > date_idx else "Recent"
+                c_camp = str(r[camp_idx]).strip() if len(r) > camp_idx else ""
+                c_city = str(r[city_idx]).strip() if len(r) > city_idx else "National"
+                c_asset = str(r[asset_idx]).strip() if len(r) > asset_idx else ""
+                c_detail = str(r[detail_idx]).strip() if len(r) > detail_idx else ""
+                c_type = str(r[type_idx]).strip() if len(r) > type_idx else ""
+
+                # City Geo Matching
+                is_city_match = target_cities and c_city and any(tc in c_city.lower() for tc in target_cities)
+                tag = " [📍 SAME CITY MATCH]" if is_city_match else ""
+                is_priority = bool(is_city_match)
+
+                # Format single clean case study line
+                display_asset = f" | Assets: {c_asset}" if c_asset else ""
+                display_detail = f" | Details: {c_detail}" if c_detail else ""
+                entry = f"- {c_brand} ({c_city}): {c_camp or 'Campaign'} ({c_type}){display_asset}{display_detail} | Date: {c_date}{tag}"
+                entry_lower = entry.lower()
+
+                # Priority 1: Exact Brand Match (Newest to Oldest)
+                if brand_clean and len(brand_clean) > 2 and (brand_clean in c_brand.lower() or c_brand.lower() in brand_clean):
+                    if is_priority and len(cs_brand_p) < 4:
+                        cs_brand_p.append(entry)
+                    elif not is_priority and len(cs_brand_o) < 4:
+                        cs_brand_o.append(entry)
+                # Priority 2: Sub-Category / Competitor Match (Newest to Oldest)
+                elif valid_sub_kws and (any(k in c_sub for k in valid_sub_kws) or any(k in entry_lower for k in valid_sub_kws)):
+                    if is_priority and len(cs_sub_p) < 6:
+                        cs_sub_p.append(entry)
+                    elif not is_priority and len(cs_sub_o) < 6:
+                        cs_sub_o.append(entry)
+                # Priority 3: Broad Industry Match (Newest to Oldest)
+                elif valid_ind_kws and (any(k in c_ind for k in valid_ind_kws) or any(k in entry_lower for k in valid_ind_kws)):
+                    if is_priority and len(cs_ind_p) < 6:
+                        cs_ind_p.append(entry)
+                    elif not is_priority and len(cs_ind_o) < 6:
+                        cs_ind_o.append(entry)
 
     except Exception as e_cs:
-        print(f"  ⚠️ Warning querying case_studies from BigQuery: {e_cs}")
+        print(f"  ⚠️ Warning querying case_studies from Master Sheet: {e_cs}")
 
     if cs_brand_p or cs_brand_o:
         case_study_entries.append("**Exact Brand Case Studies:**")
