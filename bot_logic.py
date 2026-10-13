@@ -1995,11 +1995,11 @@ def get_brand_visual_context(gemini_client, brand_name, industry, generated_brie
 
 def generate_creative_with_gemini_image(gemini_client, brand_name, industry, visual_context):
     """
-    Generates a professional 3-panel side-by-side marketing funnel mockup collage:
+    Generates a professional 3-panel side-by-side marketing funnel mockup collage in 2K Resolution:
     - Panel 1: Outdoor Residential Gateway (Awareness)
     - Panel 2: Captive Elevator Cabin (Recall)
     - Panel 3: Native Mobile In-App Placement (Conversion)
-    Powered by Gemini Nano Banana 2.1 (gemini-nano-banana-2.1) for high-efficiency image generation.
+    Powered by Gemini Nano Banana 2.1 (gemini-nano-banana-2.1) configured for 2K ultra-sharp output.
     """
     if not visual_context:
         print(f"  Skipping image generation for {brand_name}: Visual context was not extracted.")
@@ -2033,9 +2033,9 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
     print(f"  🎯 Dynamic Target Audience: '{target_audience}'")
     print(f"  📝 Captions -> P1 (Static): '{caption_p1}' | P2 (Static): '{caption_p2}' | P3 (Dynamic): '{caption_p3}'")
     
-    # EXACT DESIGN PROMPT WITH STATIC & DYNAMIC VALUES INJECTED
+    # EXACT DESIGN PROMPT WITH 2K SHARPNESS & REFINED MOBILE UI SPECIFICATIONS
     image_prompt = f"""
-    Create a highly professional, commercial-grade horizontal mockup collage with a clean, symmetric aspect ratio. 
+    Create a highly professional, commercial-grade horizontal mockup collage with a clean, symmetric aspect ratio in ultra-sharp 2K definition. 
     The layout consists of a clean, plain white top header banner, followed by exactly three vertical panels (columns) positioned side-by-side, separated by thin, clean, solid white lines.
     
     # TOP HEADER BANNER (Span across the entire width of the collage):
@@ -2044,7 +2044,7 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
       "From Visibility to Conversion — Powered by NoBrokerHood"
 
     # OVERALL STYLE, COLOR & AESTHETIC:
-    - Consistent professional color grading and editorial tone across all three panels.
+    - Consistent professional color grading, ultra-sharp focus, and editorial tone across all three panels.
     - Soft, subtle depth-of-field background blurs to focus viewer attention on ad placements.
     - Real-world physics: clean drop-shadows under the poster frames and panels to convey realistic depth.
     - The palette strictly reflects the brand's primary colors ({colors}).
@@ -2052,6 +2052,7 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
     # STRICT COMPOSITION RULES (MANDATORY):
     - Each of the three panels must depict strictly ONE single focal point and ONE single ad placement. 
     - CRITICAL: Do NOT tile, repeat, split, or place multiple small banners inside any panel.
+    - TEXT CLARITY: All typography, brand names, and UI elements must be rendered crisp, sharp, and highly legible without distortion or blur.
 
     # PANEL 1 (LEFT COLUMN): OUTDOOR RESIDENTIAL GATEWAY (Awareness)
     - ENVIRONMENT: Street-level daylight view of a premium Indian apartment complex entrance with a standard black sliding iron residential gate.
@@ -2069,20 +2070,23 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
       "{caption_p2}"
 
     # PANEL 3 (RIGHT COLUMN): NATIVE MOBILE IN-APP PLACEMENT (Conversion)
-    - ENVIRONMENT: Premium close-up photo of a modern smartphone held in a hand, against a softly blurred home background.
-    - MEDIA: Smartphone screen displaying a dark-themed NoBrokerHood application interface.
-    - UI DETAILS: A clean white delivery pre-approval card floats at the top with a green header. Directly below is a full-width vertical banner ad for '{brand_name}' showing the campaign scene ("{visual_scene}"), logo, and slogan "{short_slogan}".
+    - ENVIRONMENT: Close-up macro photo of a modern smartphone held firmly in hand, with a softly blurred living room background.
+    - MEDIA: Smartphone screen displaying a dark-themed NoBrokerHood application interface with razor-sharp text legibility.
+    - UI DETAILS: A clean white delivery pre-approval card floats at the top with a green header badge reading "Delivery Pre-Approved". Directly below is a prominent full-width vertical banner ad for '{brand_name}' showing the campaign scene ("{visual_scene}"), sharp logo, and bold slogan "{short_slogan}".
     - CAPTION: White text centered in a dark, semi-transparent horizontal strip at the bottom. The text must read exactly:
       "{caption_p3}"
     """
     
-    print(f"  🎨 Generating image using Gemini model 'gemini-nano-banana-2.1'...")
+    print(f"  🎨 Generating image using Gemini model 'gemini-nano-banana-2.1' at 2K resolution...")
     try:
         response = gemini_client.models.generate_content(
             model="gemini-nano-banana-2.1",
             contents=image_prompt,
             config=types.GenerateContentConfig(
-                response_modalities=["IMAGE", "TEXT"]
+                response_modalities=["IMAGE", "TEXT"],
+                image_config=types.ImageConfig(
+                    image_size="2K"  # Explicitly enforces 2K high-fidelity output
+                )
             )
         )
 
@@ -2097,11 +2101,11 @@ def generate_creative_with_gemini_image(gemini_client, brand_name, industry, vis
                         if not raw_data.startswith(b'\xff\xd8\xff'):
                             raw_data = base64.b64decode(raw_data)
                     
-                    print(f"  ✅ Gemini Nano Banana 2.1 image generation successful for {brand_name}.")
+                    print(f"  ✅ Gemini Nano Banana 2.1 (2K) image generation successful for {brand_name}.")
                     return raw_data
 
     except Exception as api_err:
-        print(f"  ⚠️ Gemini Nano Banana 2.1 image generation failed: {api_err}")
+        print(f"  ⚠️ Gemini Nano Banana 2.1 (2K) image generation failed: {api_err}")
 
     return None
 # --- Email Sending ---
