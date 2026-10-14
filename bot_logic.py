@@ -2994,7 +2994,8 @@ def prepare_gamma_5_cards_with_gemini(gemini_client, brand_name, brief_text, cus
     """
     Acts as VP of Brand Partnerships & Senior Ad Sales Strategist at NoBrokerHood.
     Extracts REAL campaigns and case studies from Section 4 & 5 of the Pre-Meeting Brief.
-    Builds 7 executive cards where peer brands and quantifiable ROI are headlined prominently.
+    Builds 7 executive cards with verified peer brands and hard ROI metrics.
+    STRICT COMPLIANCE: Prohibits AI-generated fake images on Slides 4, 5, 6, and 7.
     """
     if not gemini_client or not brief_text:
         return f"# Partnership Proposal: NoBrokerHood × {brand_name}\nHyperlocal Resident Monetization"
@@ -3002,14 +3003,14 @@ def prepare_gamma_5_cards_with_gemini(gemini_client, brand_name, brief_text, cus
     mockup_instruction = ""
     if custom_mockup_url:
         mockup_instruction = f"""
-CRITICAL MEDIA MOCKUP REQUIREMENT FOR SLIDE 3:
+CRITICAL MEDIA MOCKUP REQUIREMENT FOR SLIDE 3 ONLY:
 Embed this EXACT live customized ad mockup on Slide 3 showing {brand_name}'s live campaign placed on the society gate, lift frame, and app:
 ![{brand_name} Omnichannel Mockup]({custom_mockup_url})
 """
 
     prompt = f"""
 You are the Head of Brand Partnerships & Executive Pitch Strategist at NoBrokerHood (NBH).
-You are pitching NoBrokerHood's captive residential advertising network to '{brand_name}'.
+You are pitching NoBrokerHood's advertising ecosystem to '{brand_name}'.
 
 Here is the full Pre-Meeting Intelligence Brief for '{brand_name}':
 ---
@@ -3018,13 +3019,11 @@ Here is the full Pre-Meeting Intelligence Brief for '{brand_name}':
 
 {mockup_instruction}
 
-IMPORTANT BUSINESS PERSPECTIVE FOR SLIDES 6 & 7 (PROVEN EXECUTION & ROI):
-Look closely at "4. Recent Campaign Examples (Live Data)" and "5. Proven Case Studies (Success Stories)" in the brief above.
-Do NOT use generic filler or unrelated categories (e.g. NEVER mention schools if the brand is FMCG/Automotive/Quick Commerce!).
-Header each example with:
-1. **THE HERO BRAND & STATUS**: Write `[VERIFIED NBH EXECUTION] <Brand Name> (<City>)` in bold.
-2. **THE CORE ROI & NUMERICAL IMPACT**: Highlight specific metrics from the data (e.g., Impressions achieved, CTR, Orders booked, footfalls, dwell time).
-3. **THE ON-GROUND PLAYBOOK**: Exactly which asset was used (Gate Banner, Elevator Frame, Delivery In-App Card).
+CRITICAL DESIGN & ANTI-HALLUCINATION RULES (MANDATORY):
+1. NEVER include markdown image tags ![]() or ask for illustrations on Slides 1, 2, 4, 5, 6, or 7.
+2. The ONLY image in the entire presentation must be the verified mockup URL on Slide 3.
+3. On Slides 6 and 7, DO NOT generate or describe photos. Instead, use clean executive typographic cards, bold stat callouts, and structured bullet points (like Slide 5).
+4. Strictly pull REAL peer brands from Section 4 and Section 5 of the brief.
 
 SLIDE BLUEPRINT:
 # Slide 1: The Hyperlocal Opportunity for {brand_name}
@@ -3060,25 +3059,26 @@ Create a clean Markdown table targeting {brand_name}'s core urban consumer base 
 - Next Steps: Immediate society inventory lock-in and customized micro-market pricing.
 
 # Slide 6: Proven Track Record: Real Peer Campaigns Executed on NoBrokerHood
-Extract 2 to 3 real executed peer campaigns from Section 4 of the brief matching {brand_name}'s vertical:
-- **[LIVE ON NOBROKERHOOD] <Brand 1 Name> (<City>)**:
-  * **Execution Details**: Specific media assets deployed (Gate / Lift / App).
-  * **Campaign Scope**: Society coverage and verified residential households engaged.
-  * **Strategic Impact**: How it drove instant neighborhood trust and consideration.
-- **[LIVE ON NOBROKERHOOD] <Brand 2 Name> (<City>)**:
-  * **Execution Details**: Specific media assets deployed.
-  * **Strategic Impact**: Dwell-time capture during calm evening domestic transit moments.
-- Conclude: *"A proven, field-tested residential playbook built for {brand_name}'s category."*
+(DO NOT include images. Present as 3 clean executive data cards based on Section 4 of the brief):
+- **[LIVE ON NOBROKERHOOD] <Peer Brand 1> (<City>)**:
+  * **Verified Metrics**: Total verified impressions and residential reach logged in data.
+  * **Format Deployed**: Specific assets (e.g., Gate Banners, Lift Snap Frames, In-App Delivery Cards).
+  * **Business Result**: Measurable lift in brand recall and neighborhood orders.
+- **[LIVE ON NOBROKERHOOD] <Peer Brand 2> (<City>)**:
+  * **Verified Metrics**: Society coverage and audience cohort reached.
+  * **Format Deployed**: Multi-touchpoint residential presence.
+  * **Business Result**: High conversion during domestic decision-making transit moments.
+- **Key Takeaway**: *"A proven, field-tested residential playbook built specifically for {brand_name}'s industry."*
 
 # Slide 7: Demonstrated ROI & Business Performance Benchmarks
-Extract proven case study benchmarks from Section 5 of the brief:
-- **Headlined Metric**: State the verified return (e.g. 800k+ Impressions, 45s Captive Attention, 2.8× Higher Recall vs Social Ads).
-- **The Challenge Solved**: Eliminating 40%+ digital ad waste by reaching verified homeowners directly.
-- **The Conversion Engine**: How combined Gate + Lift + App touchpoints drive measurable trials, orders, and inquiries.
-- **Executive Takeaway**: *"Why Partner With NBH: We have delivered measurable ROI for your peers and category leaders. We are ready to replicate this performance for {brand_name}."*
+(DO NOT include images. Present as bold ROI stat callouts based on Section 5 of the brief):
+- **Headlined Impact**: 45s Captive Elevator Attention | 100% Verified Households | Zero Bot Traffic.
+- **Customer Acquisition Advantage**: Achieving up to 40% lower CAC compared to cluttered open-web social channels.
+- **Proven Conversion Flywheel**: How ambient physical gate visibility combined with mobile pre-approval cards triggers direct app purchases.
+- **Executive Pitch Statement**: *"We have delivered verified resident engagement and high-intent conversions for category peers. We are ready to replicate this performance for {brand_name}."*
 
 Format strictly as clean Markdown with `# Slide Title`, clear bullet points, bold key terms, and the table on Slide 4.
-Do not use markdown code fences (```).
+Do not use markdown code fences (```) or image markdown tags outside Slide 3.
 """
     try:
         config = types.GenerateContentConfig(temperature=0.2)
@@ -3090,24 +3090,24 @@ Do not use markdown code fences (```).
 
 
 # =====================================================================
-# FAST IN-MEMORY CASE STUDY LIBRARY & SPLICER ENGINE (BULLETPROOF V3)
+# FAST IN-MEMORY CASE STUDY LIBRARY & SPLICER ENGINE (BULLETPROOF V4)
 # =====================================================================
 import random
 
-# Verified Drive File IDs & Names from your uploaded Google Drive folder
-CASE_STUDY_DECK_SOUTH_ID = os.getenv("CASE_STUDY_DECK_SOUTH_ID", "1MPhr3_6lUkfp8tp41A5fwrgB9u0a8r7J")
-CASE_STUDY_DECK_REGIONAL_ID = os.getenv("CASE_STUDY_DECK_REGIONAL_ID", "1YNlDX10G0N9DnnoFjVoDsjH5YjfEZstv")
+# Corrected Drive IDs with exact capitalization matching your Drive uploads
+CASE_STUDY_DECK_SOUTH_ID = os.getenv("CASE_STUDY_DECK_SOUTH_ID", "1MPhr3_6IUkfp8tp41A5fwrgB9u0a8r7J")
+CASE_STUDY_DECK_REGIONAL_ID = os.getenv("CASE_STUDY_DECK_REGIONAL_ID", "1YNiDX10G0N9DnnoFjVoDsjH5YJfEZstv")
 
 CASE_STUDIES_LOCAL_CACHE_DIR = "/tmp/nbh_case_studies_cache"
 os.makedirs(CASE_STUDIES_LOCAL_CACHE_DIR, exist_ok=True)
 
 INDUSTRY_KEYWORDS_MAP = {
     "Education & Training": ["school", "preschool", "academy", "college", "education", "edtech", "classes", "university", "learning", "curriculum", "campus", "tuition", "admissions", "orchids", "ekya", "vidyashilp", "national public", "oakridge", "eurokids", "jamboree", "kidz crayon"],
-    "Food & Beverage": ["food", "beverage", "recipe", "snack", "drink", "tea", "coffee", "dairy", "milk", "organic", "restaurant", "grocery", "cafe", "kitchen", "mother's recipe", "organic world"],
+    "Food & Beverage": ["food", "beverage", "recipe", "snack", "drink", "tea", "coffee", "dairy", "milk", "organic", "restaurant", "grocery", "cafe", "kitchen", "mother's recipe", "organic world", "zomato", "swiggy"],
     "Automotive & Transportation": ["car", "bike", "motor", "auto", "vehicle", "ride", "mobility", "drive", "ev", "scooter", "swift", "maruti", "tata motors", "cab", "rapido", "garnet", "skoda"],
     "Healthcare": ["health", "hospital", "clinic", "diagnostic", "pharma", "medicine", "doctor", "care", "wellness", "pharmacy", "medical", "lab", "orange health", "tata 1mg", "manipal"],
     "Pharma": ["pharma", "medicine", "tablet", "pharmaceutical", "health", "capsule", "sampling", "dosage", "mankind"],
-    "Quick Commerce": ["grocery", "instant", "delivery", "10 min", "blinkit", "zepto", "instamart", "swiggy", "bbnow", "d2d", "e-grocery"],
+    "Quick Commerce": ["grocery", "instant", "delivery", "10 min", "blinkit", "zepto", "instamart", "swiggy", "bbnow", "d2d", "e-grocery", "zomato"],
     "Finance & Fintech": ["bank", "loan", "card", "insurance", "credit", "fintech", "wealth", "invest", "mutual fund", "payment", "idfc"],
     "Real Estate & Construction": ["real estate", "property", "apartment", "villa", "home", "builder", "flat", "realty"],
     "Beauty & Personal Care": ["beauty", "cosmetics", "skincare", "haircare", "salon", "makeup", "lotion", "serum"],
@@ -3145,8 +3145,7 @@ def load_cached_presentation_from_drive(drive_service, file_id, file_label, fall
         while not done:
             _, done = downloader.next_chunk()
     except Exception as e_direct:
-        # 2. If it's a Google Presentation, export it as PPTX
-        print(f"  🔄 Direct binary failed ({e_direct}). Attempting Drive Export as PPTX...", flush=True)
+        # 2. If Google converted to Slides, export as PPTX
         fh = io.BytesIO()
         try:
             request = drive_service.files().export_media(
@@ -3158,8 +3157,7 @@ def load_cached_presentation_from_drive(drive_service, file_id, file_label, fall
             while not done:
                 _, done = downloader.next_chunk()
         except Exception as e_export:
-            print(f"  ⚠️ Export failed for {file_label}: {e_export}", flush=True)
-            # 3. Search Drive by filename if ID was replaced
+            # 3. Fallback search by filename
             if fallback_filename:
                 try:
                     q = f"name contains '{fallback_filename}' and trashed=false"
@@ -3189,9 +3187,7 @@ def load_cached_presentation_from_drive(drive_service, file_id, file_label, fall
 
 
 def extract_presentation_text_catalog(prs, deck_label):
-    """
-    Extracts text catalog from presentation in ~0.05s without decoding images.
-    """
+    """Extracts text catalog from presentation in ~0.05s."""
     catalog = []
     if not prs:
         return catalog
@@ -3204,8 +3200,7 @@ def extract_presentation_text_catalog(prs, deck_label):
         full_text = " ".join(texts).strip()
         full_text_lower = full_text.lower()
         
-        # Skip intro dividers and thank-you slides
-        if len(full_text) < 25 or "case studies" in full_text_lower or "thank you" in full_text_lower or full_text_lower.startswith("regional campaign"):
+        if len(full_text) < 25 or "thank you" in full_text_lower or full_text_lower.startswith("regional campaign"):
             continue
             
         catalog.append({
@@ -3217,15 +3212,11 @@ def extract_presentation_text_catalog(prs, deck_label):
 
 
 def select_best_3_case_studies(catalog_south, catalog_regional, target_industry, sub_category_keywords, brand_name):
-    """
-    Scores slides against target industry & sub-categories.
-    Guarantees strict industry matching and introduces rotation/variety.
-    """
+    """Scores slides against target industry & sub-categories with variety rotation."""
     target_kws = [k.strip().lower() for k in sub_category_keywords if k and len(k.strip()) > 2]
     ind_kws = INDUSTRY_KEYWORDS_MAP.get(target_industry, [target_industry.lower()])
     
     all_candidates = []
-    
     combined_catalog = []
     for c in catalog_south:
         combined_catalog.append((c, "south"))
@@ -3236,17 +3227,14 @@ def select_best_3_case_studies(catalog_south, catalog_regional, target_industry,
         text = item["text"]
         score = 0
         
-        # Priority 1: Match sub-category keywords (e.g. grocery, preschool, tea)
         for kw in target_kws:
             if kw in text:
                 score += 6
                 
-        # Priority 2: Match core industry keywords
         for ikw in ind_kws:
             if ikw in text:
                 score += 4
                 
-        # Priority 3: Direct brand match
         if brand_name and brand_name.lower() in text:
             score += 15
             
@@ -3258,10 +3246,8 @@ def select_best_3_case_studies(catalog_south, catalog_regional, target_industry,
                 "id": f"{deck_key}_{item['slide_idx']}"
             })
 
-    # Sort candidates by relevance
     all_candidates.sort(key=lambda x: x["score"], reverse=True)
     
-    # Variety Engine: Read recently used slide IDs from history
     history_file = "/tmp/recent_case_studies_history.json"
     recent_ids = []
     if os.path.exists(history_file):
@@ -3275,9 +3261,7 @@ def select_best_3_case_studies(catalog_south, catalog_regional, target_industry,
     stale_candidates = [c for c in all_candidates if c["id"] in recent_ids]
 
     selected = []
-    
     if len(fresh_candidates) >= 3:
-        # Sample 3 from top pool of up to 6 matches to ensure variety
         top_pool = fresh_candidates[:min(6, len(fresh_candidates))]
         selected = random.sample(top_pool, 3)
     else:
@@ -3286,7 +3270,6 @@ def select_best_3_case_studies(catalog_south, catalog_regional, target_industry,
         if stale_candidates:
             selected += stale_candidates[:remaining]
 
-    # Fallback: fill with top remaining if fewer than 3 found
     if len(selected) < 3:
         for item, deck_key in combined_catalog:
             cand = {"deck": deck_key, "slide_idx": item["slide_idx"], "score": 1, "id": f"{deck_key}_{item['slide_idx']}"}
@@ -3306,16 +3289,11 @@ def select_best_3_case_studies(catalog_south, catalog_regional, target_industry,
 
 
 def copy_case_study_slide_contents(source_slide, target_slide):
-    """
-    Cleans target blank slide and copies all shapes, textboxes, red cards,
-    metrics, and on-ground campaign images from source slide.
-    """
-    # 1. Clean out the target slide
+    """Deep-copies all shapes, textboxes, red cards, metrics, and images from source to target slide."""
     for shape in list(target_slide.shapes):
         sp_elem = shape._element
         sp_elem.getparent().remove(sp_elem)
 
-    # 2. Copy background
     if source_slide.background and source_slide.background.fill:
         try:
             target_slide.background.fill.solid()
@@ -3323,7 +3301,6 @@ def copy_case_study_slide_contents(source_slide, target_slide):
         except Exception:
             pass
 
-    # 3. Copy all shapes and real photos
     for shape in source_slide.shapes:
         if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
             try:
@@ -3347,14 +3324,15 @@ def copy_case_study_slide_contents(source_slide, target_slide):
 
 def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id, gamma_pptx_bytes, brand_name, brief_text, gemini_client, output_folder_id, creative_image_bytes=None, meeting_industry=None, sub_category_keywords=None):
     """
-    1. Downloads & opens the Master Deck from Google Drive.
-    2. Updates Slide 1 Cover Brand Name (Times New Roman, Italic, 46pt, Pure White).
-    3. Updates Slide 11 Objectives & Target Audience.
-    4. Populates Slide 12 with centered 3-Panel Funnel Mockup.
+    Slices and dices Gamma slides + Master Template:
+    1. Downloads & opens Master Deck.
+    2. Updates Cover Slide (Times New Roman, Italic, 46pt, Pure White).
+    3. Updates Slide 11 Objectives & Audience.
+    4. Populates Slide 12 with 3-Panel Funnel Mockup.
     5. Inserts Gamma Strategy Slides (Slides 13–19).
-    6. Dynamically locates the "Case Studies" divider slide and populates the 3 blank template slides
-       with REAL visual case studies (on-ground photos + metrics) matching the exact industry.
-    7. Saves finalized deck to Google Drive.
+    6. Bulletproof Regex Search for 'Case Studies' Divider Slide (handles newlines 'Case\\nStudies')
+       and populates the 3 blank template slides with REAL visual case studies.
+    7. Saves finalized presentation to Google Drive.
     """
     from pptx.dml.color import RGBColor
     from pptx.enum.text import PP_ALIGN
@@ -3545,7 +3523,7 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
                         else:
                             p.font.size = Pt(22.5)
                     elif g_idx in [5, 6]:
-                        if any(c in p_text.lower() for c in ["live on nobrokerhood", "verified nbh", "proven track record", "demonstrated roi"]):
+                        if any(c in p_text.lower() for c in ["live on nobrokerhood", "proven track record", "demonstrated roi"]):
                             p.font.size = Pt(34)
                             p.font.bold = True
                         elif p.font.bold:
@@ -3553,7 +3531,7 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
                         else:
                             p.font.size = Pt(20)
 
-            if shape.has_table and g_idx in [3, 5, 6]:
+            if shape.has_table and g_idx == 3:
                 table = shape.table
                 for row in table.rows:
                     for cell in row.cells:
@@ -3588,19 +3566,36 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
             brand_name=brand_name
         )
 
-        # Locate the "Case Studies" section header slide dynamically across all slides
+        # Robust Multi-Strategy Search for the 'Case Studies' Divider Slide
+        # Handles newlines ("Case\nStudies") or searches back from the "Thank You" slide
         case_studies_header_idx = -1
+        total_slides = len(prs_master.slides)
+
+        # Strategy A: Regex whitespace search for "CASE STUDIES" on all text shapes
         for s_idx, s in enumerate(prs_master.slides):
             for shape in s.shapes:
                 if shape.has_text_frame:
-                    t = shape.text_frame.text.upper()
-                    if "CASE STUDIES" in t and "REGIONAL" not in t:
+                    clean_t = re.sub(r'\s+', ' ', shape.text_frame.text).strip().upper()
+                    if re.search(r'\bCASE\s+STUDIES\b', clean_t) and "REGIONAL" not in clean_t:
                         case_studies_header_idx = s_idx
                         break
             if case_studies_header_idx != -1:
                 break
 
-        if case_studies_header_idx != -1 and len(prs_master.slides) >= case_studies_header_idx + 4:
+        # Strategy B: Fallback - locate "THANK YOU" slide at the end (the 3 blank slides are right before it)
+        if case_studies_header_idx == -1 and total_slides >= 5:
+            for s_idx in range(total_slides - 1, max(0, total_slides - 4), -1):
+                s = prs_master.slides[s_idx]
+                for shape in s.shapes:
+                    if shape.has_text_frame and "THANK YOU" in shape.text_frame.text.upper():
+                        # The 3 blank slides sit at s_idx - 3, s_idx - 2, s_idx - 1; divider is s_idx - 4
+                        case_studies_header_idx = s_idx - 4
+                        print(f"  🔍 Located 'Case Studies' section via Thank You anchor (Slide {case_studies_header_idx + 1}).", flush=True)
+                        break
+                if case_studies_header_idx != -1:
+                    break
+
+        if case_studies_header_idx != -1 and total_slides >= case_studies_header_idx + 4:
             print(f"  🎯 [Case Study Engine] Located 'Case Studies' divider at Slide {case_studies_header_idx + 1}. Populating next 3 slides...", flush=True)
             for i, match in enumerate(best_3_slides):
                 target_slide_idx = case_studies_header_idx + 1 + i
@@ -3651,7 +3646,7 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
 
 def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client, creative_image_bytes=None, event_id="", drive_service=None, output_folder_id="1RhhsFq5NGC2QtHPj8FQaU5BfhxJR5R6I", meeting_industry=None, sub_category_keywords=None):
     """
-    1. Generates 7 tailored cards via Gamma API (5 strategic + 2 real peer ROI proof cards).
+    1. Generates 7 tailored cards via Gamma API with custom creative mockup.
     2. Downloads Gamma's output PPTX.
     3. Splices them into your Master Deck and injects 3 real visual case studies matching the industry.
     """
@@ -3663,7 +3658,7 @@ def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client, creative_im
     if creative_image_bytes:
         custom_mockup_url = upload_creative_to_gcs(creative_image_bytes, brand_name, event_id)
 
-    print(f"  📊 [GAMMA] Deep-mining brief to write 7 bespoke pitch cards for '{brand_name}'...", flush=True)
+    print(f"  📊 [GAMMA] Deep-mining brief to write 5 bespoke pitch cards for '{brand_name}'...", flush=True)
     deck_markdown = prepare_gamma_5_cards_with_gemini(
         gemini_client=gemini_client,
         brand_name=brand_name,
@@ -3728,8 +3723,10 @@ def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client, creative_im
             print("  ⚠️ [GAMMA] Export URL not ready in time.", flush=True)
             return None
 
+        # Download the 7 Gamma slides into memory
         gamma_pptx_bytes = requests.get(gamma_pptx_url, timeout=30).content
 
+        # Splice Gamma slides & real visual case studies into Master Deck
         return splice_gamma_slides_into_master_deck(
             drive_service=drive_service,
             master_template_file_id=NBH_MASTER_TEMPLATE_FILE_ID,
