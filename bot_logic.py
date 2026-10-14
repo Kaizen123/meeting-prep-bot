@@ -2995,7 +2995,7 @@ def prepare_gamma_5_cards_with_gemini(gemini_client, brand_name, brief_text, cus
     Acts as VP of Brand Partnerships & Senior Ad Sales Strategist at NoBrokerHood.
     Extracts REAL campaigns and case studies from Section 4 & 5 of the Pre-Meeting Brief.
     Builds 7 executive cards with verified peer brands and hard ROI metrics.
-    STRICT COMPLIANCE: Prohibits AI-generated fake images on Slides 4, 5, 6, and 7.
+    STRICT COMPLIANCE: Prohibits AI-generated fake images on Slides 1, 2, 4, 5, 6, and 7.
     """
     if not gemini_client or not brief_text:
         return f"# Partnership Proposal: NoBrokerHood × {brand_name}\nHyperlocal Resident Monetization"
@@ -3019,11 +3019,11 @@ Here is the full Pre-Meeting Intelligence Brief for '{brand_name}':
 
 {mockup_instruction}
 
-CRITICAL DESIGN & ANTI-HALLUCINATION RULES (MANDATORY):
-1. NEVER include markdown image tags ![]() or ask for illustrations on Slides 1, 2, 4, 5, 6, or 7.
+CRITICAL RULES TO PREVENT FAKE/HALLUCINATED AI IMAGES:
+1. NEVER include markdown image tags ![]() on Slides 1, 2, 4, 5, 6, or 7.
 2. The ONLY image in the entire presentation must be the verified mockup URL on Slide 3.
-3. On Slides 6 and 7, DO NOT generate or describe photos. Instead, use clean executive typographic cards, bold stat callouts, and structured bullet points (like Slide 5).
-4. Strictly pull REAL peer brands from Section 4 and Section 5 of the brief.
+3. On Slides 6 and 7, do NOT describe physical scenes or visual settings. Instead, format them purely as executive metric cards and text-based stat callouts (like Slide 5).
+4. Strictly pull REAL peer brands from Section 4 and Section 5 of the brief. If none match, highlight broader corporate achievements.
 
 SLIDE BLUEPRINT:
 # Slide 1: The Hyperlocal Opportunity for {brand_name}
@@ -3059,7 +3059,7 @@ Create a clean Markdown table targeting {brand_name}'s core urban consumer base 
 - Next Steps: Immediate society inventory lock-in and customized micro-market pricing.
 
 # Slide 6: Proven Track Record: Real Peer Campaigns Executed on NoBrokerHood
-(DO NOT include images. Present as 3 clean executive data cards based on Section 4 of the brief):
+(DO NOT include images or visual descriptions. Present as 3 clean executive data cards based on Section 4 of the brief):
 - **[LIVE ON NOBROKERHOOD] <Peer Brand 1> (<City>)**:
   * **Verified Metrics**: Total verified impressions and residential reach logged in data.
   * **Format Deployed**: Specific assets (e.g., Gate Banners, Lift Snap Frames, In-App Delivery Cards).
@@ -3090,23 +3090,23 @@ Do not use markdown code fences (```) or image markdown tags outside Slide 3.
 
 
 # =====================================================================
-# FAST IN-MEMORY CASE STUDY LIBRARY & SPLICER ENGINE (BULLETPROOF V4)
+# FAST IN-MEMORY CASE STUDY LIBRARY & SPLICER ENGINE (BULLETPROOF V5)
 # =====================================================================
 import random
 
-# Corrected Drive IDs with exact capitalization matching your Drive uploads
 CASE_STUDY_DECK_SOUTH_ID = os.getenv("CASE_STUDY_DECK_SOUTH_ID", "1MPhr3_6IUkfp8tp41A5fwrgB9u0a8r7J")
 CASE_STUDY_DECK_REGIONAL_ID = os.getenv("CASE_STUDY_DECK_REGIONAL_ID", "1YNiDX10G0N9DnnoFjVoDsjH5YJfEZstv")
 
 CASE_STUDIES_LOCAL_CACHE_DIR = "/tmp/nbh_case_studies_cache"
 os.makedirs(CASE_STUDIES_LOCAL_CACHE_DIR, exist_ok=True)
 
+# Strict industry keyword clusters ensuring zero cross-industry contamination
 INDUSTRY_KEYWORDS_MAP = {
+    "Healthcare": ["health", "hospital", "clinic", "diagnostic", "doctor", "care", "wellness", "medical", "lab", "orange health", "tata 1mg", "manipal", "apollo", "mfine", "pharma", "medicine"],
+    "Pharma": ["pharma", "medicine", "tablet", "pharmaceutical", "health", "capsule", "sampling", "dosage", "mankind"],
     "Education & Training": ["school", "preschool", "academy", "college", "education", "edtech", "classes", "university", "learning", "curriculum", "campus", "tuition", "admissions", "orchids", "ekya", "vidyashilp", "national public", "oakridge", "eurokids", "jamboree", "kidz crayon"],
     "Food & Beverage": ["food", "beverage", "recipe", "snack", "drink", "tea", "coffee", "dairy", "milk", "organic", "restaurant", "grocery", "cafe", "kitchen", "mother's recipe", "organic world", "zomato", "swiggy"],
     "Automotive & Transportation": ["car", "bike", "motor", "auto", "vehicle", "ride", "mobility", "drive", "ev", "scooter", "swift", "maruti", "tata motors", "cab", "rapido", "garnet", "skoda"],
-    "Healthcare": ["health", "hospital", "clinic", "diagnostic", "pharma", "medicine", "doctor", "care", "wellness", "pharmacy", "medical", "lab", "orange health", "tata 1mg", "manipal"],
-    "Pharma": ["pharma", "medicine", "tablet", "pharmaceutical", "health", "capsule", "sampling", "dosage", "mankind"],
     "Quick Commerce": ["grocery", "instant", "delivery", "10 min", "blinkit", "zepto", "instamart", "swiggy", "bbnow", "d2d", "e-grocery", "zomato"],
     "Finance & Fintech": ["bank", "loan", "card", "insurance", "credit", "fintech", "wealth", "invest", "mutual fund", "payment", "idfc"],
     "Real Estate & Construction": ["real estate", "property", "apartment", "villa", "home", "builder", "flat", "realty"],
@@ -3131,8 +3131,8 @@ def load_cached_presentation_from_drive(drive_service, file_id, file_label, fall
         print(f"  ⚡ [Cache Hit] Loaded {file_label} instantly from local cache.", flush=True)
         try:
             return Presentation(local_path)
-        except Exception as e_cache:
-            print(f"  ⚠️ Corrupt cache for {file_label}, re-downloading: {e_cache}", flush=True)
+        except Exception:
+            pass
 
     print(f"  📥 [Downloading] Fetching {file_label} from Google Drive...", flush=True)
     fh = io.BytesIO()
@@ -3144,7 +3144,7 @@ def load_cached_presentation_from_drive(drive_service, file_id, file_label, fall
         done = False
         while not done:
             _, done = downloader.next_chunk()
-    except Exception as e_direct:
+    except Exception:
         # 2. If Google converted to Slides, export as PPTX
         fh = io.BytesIO()
         try:
@@ -3156,7 +3156,7 @@ def load_cached_presentation_from_drive(drive_service, file_id, file_label, fall
             done = False
             while not done:
                 _, done = downloader.next_chunk()
-        except Exception as e_export:
+        except Exception:
             # 3. Fallback search by filename
             if fallback_filename:
                 try:
@@ -3164,7 +3164,6 @@ def load_cached_presentation_from_drive(drive_service, file_id, file_label, fall
                     res = drive_service.files().list(q=q, fields="files(id, name)").execute().get("files", [])
                     if res:
                         found_id = res[0]["id"]
-                        print(f"  🔍 Found matching file by name: {res[0]['name']} ({found_id})", flush=True)
                         req_f = drive_service.files().get_media(fileId=found_id)
                         downloader_f = MediaIoBaseDownload(fh, req_f)
                         done_f = False
@@ -3200,6 +3199,7 @@ def extract_presentation_text_catalog(prs, deck_label):
         full_text = " ".join(texts).strip()
         full_text_lower = full_text.lower()
         
+        # Skip intro dividers and thank-you slides
         if len(full_text) < 25 or "thank you" in full_text_lower or full_text_lower.startswith("regional campaign"):
             continue
             
@@ -3212,10 +3212,22 @@ def extract_presentation_text_catalog(prs, deck_label):
 
 
 def select_best_3_case_studies(catalog_south, catalog_regional, target_industry, sub_category_keywords, brand_name):
-    """Scores slides against target industry & sub-categories with variety rotation."""
+    """
+    Selects 3 strictly matching case studies.
+    Penalizes unrelated keywords to prevent gaming/lifestyle slides appearing in Healthcare.
+    """
     target_kws = [k.strip().lower() for k in sub_category_keywords if k and len(k.strip()) > 2]
     ind_kws = INDUSTRY_KEYWORDS_MAP.get(target_industry, [target_industry.lower()])
     
+    # Negative filters based on industry
+    unrelated_penalties = []
+    if target_industry in ["Healthcare", "Pharma"]:
+        unrelated_penalties = ["gaming", "pakistan", "diaper", "cricket bat", "cycling glove", "baby product", "school", "automobile"]
+    elif target_industry in ["Education & Training"]:
+        unrelated_penalties = ["hospital", "pharma", "car", "bike", "grocery"]
+    elif target_industry in ["Automotive & Transportation"]:
+        unrelated_penalties = ["school", "hospital", "pharma", "grocery"]
+
     all_candidates = []
     combined_catalog = []
     for c in catalog_south:
@@ -3225,18 +3237,22 @@ def select_best_3_case_studies(catalog_south, catalog_regional, target_industry,
 
     for item, deck_key in combined_catalog:
         text = item["text"]
-        score = 0
         
+        # Check hard negative penalty
+        if any(bad_word in text for bad_word in unrelated_penalties):
+            continue
+            
+        score = 0
         for kw in target_kws:
             if kw in text:
-                score += 6
+                score += 8
                 
         for ikw in ind_kws:
             if ikw in text:
-                score += 4
+                score += 5
                 
         if brand_name and brand_name.lower() in text:
-            score += 15
+            score += 20
             
         if score > 0:
             all_candidates.append({
@@ -3248,6 +3264,7 @@ def select_best_3_case_studies(catalog_south, catalog_regional, target_industry,
 
     all_candidates.sort(key=lambda x: x["score"], reverse=True)
     
+    # Variety rotation using local history
     history_file = "/tmp/recent_case_studies_history.json"
     recent_ids = []
     if os.path.exists(history_file):
@@ -3270,13 +3287,15 @@ def select_best_3_case_studies(catalog_south, catalog_regional, target_industry,
         if stale_candidates:
             selected += stale_candidates[:remaining]
 
+    # Clean fallback if fewer than 3 strict matches exist
     if len(selected) < 3:
         for item, deck_key in combined_catalog:
-            cand = {"deck": deck_key, "slide_idx": item["slide_idx"], "score": 1, "id": f"{deck_key}_{item['slide_idx']}"}
-            if cand not in selected:
-                selected.append(cand)
-            if len(selected) == 3:
-                break
+            if not any(bad_word in item["text"] for bad_word in unrelated_penalties):
+                cand = {"deck": deck_key, "slide_idx": item["slide_idx"], "score": 1, "id": f"{deck_key}_{item['slide_idx']}"}
+                if cand not in selected:
+                    selected.append(cand)
+                if len(selected) == 3:
+                    break
 
     try:
         new_history = [s["id"] for s in selected]
@@ -3288,12 +3307,19 @@ def select_best_3_case_studies(catalog_south, catalog_regional, target_industry,
     return selected[:3]
 
 
-def copy_case_study_slide_contents(source_slide, target_slide):
-    """Deep-copies all shapes, textboxes, red cards, metrics, and images from source to target slide."""
-    for shape in list(target_slide.shapes):
-        sp_elem = shape._element
-        sp_elem.getparent().remove(sp_elem)
+def clone_entire_slide_contents(source_slide, target_slide):
+    """
+    1:1 XML Slide Cloner:
+    Replaces target slide's entire shape tree with source slide's shape tree,
+    preserving exact coordinates, fonts, backgrounds, grouped shapes, and images.
+    """
+    # 1. Clear target slide's existing shapes
+    spTree = target_slide.shapes._spTree
+    for child in list(spTree):
+        if child.tag.endswith('sp') or child.tag.endswith('pic') or child.tag.endswith('grpSp') or child.tag.endswith('graphicFrame'):
+            spTree.remove(child)
 
+    # 2. Clone background
     if source_slide.background and source_slide.background.fill:
         try:
             target_slide.background.fill.solid()
@@ -3301,38 +3327,33 @@ def copy_case_study_slide_contents(source_slide, target_slide):
         except Exception:
             pass
 
+    # 3. Transfer picture parts and relationships
     for shape in source_slide.shapes:
         if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
             try:
+                # Add picture directly via python-pptx to register image relationship correctly
                 img_stream = io.BytesIO(shape.image.blob)
                 target_slide.shapes.add_picture(
                     img_stream, shape.left, shape.top, width=shape.width, height=shape.height
                 )
-            except Exception as e_img:
-                print(f"      ⚠️ Warning copying picture: {e_img}", flush=True)
+            except Exception as e_pic:
+                print(f"      ⚠️ Warning cloning picture: {e_pic}", flush=True)
         else:
             try:
-                new_shape_elem = copy.deepcopy(shape.element)
-                target_slide.shapes._spTree.append(new_shape_elem)
-            except Exception:
-                try:
-                    new_shape_elem = copy.deepcopy(shape.element)
-                    target_slide.shapes._spTree.append(new_shape_elem)
-                except Exception:
-                    pass
+                cloned_elem = copy.deepcopy(shape.element)
+                spTree.append(cloned_elem)
+            except Exception as e_shp:
+                print(f"      ⚠️ Warning cloning shape: {e_shp}", flush=True)
 
 
 def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id, gamma_pptx_bytes, brand_name, brief_text, gemini_client, output_folder_id, creative_image_bytes=None, meeting_industry=None, sub_category_keywords=None):
     """
-    Slices and dices Gamma slides + Master Template:
-    1. Downloads & opens Master Deck.
-    2. Updates Cover Slide (Times New Roman, Italic, 46pt, Pure White).
-    3. Updates Slide 11 Objectives & Audience.
-    4. Populates Slide 12 with 3-Panel Funnel Mockup.
-    5. Inserts Gamma Strategy Slides (Slides 13–19).
-    6. Bulletproof Regex Search for 'Case Studies' Divider Slide (handles newlines 'Case\\nStudies')
-       and populates the 3 blank template slides with REAL visual case studies.
-    7. Saves finalized presentation to Google Drive.
+    Master Presentation Splicer:
+    - Slide 1: Cover Brand Name in Times New Roman, Italic, 46pt, Pure White.
+    - Slide 11: Objectives & Audience with clean, centered layout and vertical hierarchy.
+    - Slide 12: Centered 3-Panel Funnel Mockup (11.8" x 5.9") at mathematical center.
+    - Slides 13–19: Gamma Strategy & Performance Cards (AI fake images banned).
+    - Slides 28–30: Real Case Studies 1:1 Cloned into the 3 blank template slides.
     """
     from pptx.dml.color import RGBColor
     from pptx.enum.text import PP_ALIGN
@@ -3365,7 +3386,7 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
     p.font.size = Pt(46)
     p.font.color.rgb = RGBColor(255, 255, 255)
 
-    # --- STEP 2: SLIDE 11 (TITLE & OBJECTIVES) ---
+    # --- STEP 2: SLIDE 11 (TITLE & OBJECTIVES - CLEAN, PROFESSIONAL CENTERING) ---
     print(f"  ✍️ [Deck Engine] Formatting Slide 11 Objectives & Audience...", flush=True)
     slide_11 = prs_master.slides[10]
     slide_11_data = update_slide_11_objectives_with_gemini(gemini_client, brand_name, brief_text)
@@ -3376,63 +3397,76 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
             if "HOW CAN WE HELP" in full_text.upper():
                 shape.text_frame.word_wrap = True
                 p_title = shape.text_frame.paragraphs[0]
-                p_title.font.size = Pt(42)
+                p_title.font.size = Pt(36)
                 p_title.font.bold = True
                 p_title.font.color.rgb = RGBColor(253, 55, 82)
                 p_title.alignment = PP_ALIGN.CENTER
             elif "The primary objective of the campaign" in full_text:
                 shape.text_frame.clear()
                 shape.text_frame.word_wrap = True
-                shape.left = Inches(0.9)
-                shape.top = Inches(1.7)
-                shape.width = Inches(11.5)
-                shape.height = Inches(5.5)
+                
+                # Symmetrically centered text box across the 13.33" slide width
+                shape.left = Inches(1.0)
+                shape.top = Inches(1.3)
+                shape.width = Inches(11.33)
+                shape.height = Inches(5.8)
 
+                # Primary Objective Header
                 p_head1 = shape.text_frame.paragraphs[0]
                 p_head1.text = "The primary objective of the campaign:"
                 p_head1.font.bold = True
-                p_head1.font.size = Pt(28)
+                p_head1.font.size = Pt(24)
                 p_head1.font.color.rgb = RGBColor(253, 55, 82)
                 p_head1.alignment = PP_ALIGN.CENTER
-                p_head1.space_after = Pt(4)
+                p_head1.space_after = Pt(6)
 
+                # 5 Objectives Bullets
                 for obj in slide_11_data.get("campaign_objectives", []):
                     p = shape.text_frame.add_paragraph()
                     p.text = f"• {obj}"
-                    p.font.size = Pt(26)
-                    p.font.color.rgb = RGBColor(38, 41, 48)
+                    p.font.size = Pt(18)
+                    p.font.color.rgb = RGBColor(45, 55, 72)
                     p.alignment = PP_ALIGN.CENTER
                     p.space_after = Pt(3)
 
+                # Target Audience Header
                 p_head2 = shape.text_frame.add_paragraph()
                 p_head2.text = "\nTARGET AUDIENCE:"
                 p_head2.font.bold = True
-                p_head2.font.size = Pt(28)
+                p_head2.font.size = Pt(24)
                 p_head2.font.color.rgb = RGBColor(253, 55, 82)
                 p_head2.alignment = PP_ALIGN.CENTER
-                p_head2.space_after = Pt(4)
+                p_head2.space_before = Pt(8)
+                p_head2.space_after = Pt(6)
 
+                # 3 Target Audience Bullets
                 for aud in slide_11_data.get("target_audience", []):
                     p = shape.text_frame.add_paragraph()
                     p.text = f"• {aud}"
-                    p.font.size = Pt(26)
-                    p.font.color.rgb = RGBColor(38, 41, 48)
+                    p.font.size = Pt(18)
+                    p.font.color.rgb = RGBColor(45, 55, 72)
                     p.alignment = PP_ALIGN.CENTER
                     p.space_after = Pt(3)
 
-    # --- STEP 3: SLIDE 12 (CENTERED 3-PANEL MOCKUP) ---
+    # --- STEP 3: SLIDE 12 (EXACT MATHEMATICAL CENTERING OF 3-PANEL MOCKUP) ---
     if creative_image_bytes and len(prs_master.slides) >= 12:
-        print(f"  🖼️ [Deck Engine] Populating Slide 12 with centered 3-panel creative mockup...", flush=True)
+        print(f"  🖼️ [Deck Engine] Centering 3-panel creative mockup on Slide 12...", flush=True)
         slide_12 = prs_master.slides[11]
         for shape in list(slide_12.shapes):
             if shape.is_placeholder:
                 sp = shape._element
                 sp.getparent().remove(sp)
 
-        img_stream = io.BytesIO(creative_image_bytes)
-        slide_12.shapes.add_picture(img_stream, Inches(0.91), Inches(1.2), width=Inches(11.5), height=Inches(5.8))
+        # Slide dimensions: 13.33" x 7.50". Center an 11.6" x 5.8" image perfectly:
+        img_width = Inches(11.6)
+        img_height = Inches(5.8)
+        img_left = Inches((13.33 - 11.6) / 2)  # 0.865 inches
+        img_top = Inches(1.1)
 
-    # --- STEP 4: INSERT GAMMA STRATEGY SLIDES (SLIDES 13 ONWARD) ---
+        img_stream = io.BytesIO(creative_image_bytes)
+        slide_12.shapes.add_picture(img_stream, img_left, img_top, width=img_width, height=img_height)
+
+    # --- STEP 4: INSERT GAMMA STRATEGY SLIDES (SLIDES 13–19) ---
     print(f"  🧬 [Deck Engine] Splicing Gamma strategy cards...", flush=True)
     master_w, master_h = prs_master.slide_width, prs_master.slide_height
     gamma_w, gamma_h = prs_gamma.slide_width, prs_gamma.slide_height
@@ -3494,14 +3528,14 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
                     p_text = p.text.strip()
                     if g_idx in [0, 1]:
                         if any(c in p_text.lower() for c in ["strategic proposition", "campaign strategy", "hook", "pillars"]):
-                            p.font.size = Pt(37)
+                            p.font.size = Pt(36)
                         elif p.font.bold:
-                            p.font.size = Pt(24.5)
+                            p.font.size = Pt(24)
                         else:
-                            p.font.size = Pt(20.5)
+                            p.font.size = Pt(20)
                     elif g_idx == 2:
                         if "in-community" in p_text.lower():
-                            p.font.size = Pt(19.5)
+                            p.font.size = Pt(19)
                         elif any(c in p_text.lower() for c in ["gate, lift", "media blueprint"]):
                             p.font.size = Pt(30)
                         elif p.font.bold:
@@ -3511,17 +3545,17 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
                     elif g_idx == 3:
                         p.alignment = PP_ALIGN.CENTER
                         if "micro-market" in p_text.lower() or "clusters" in p_text.lower():
-                            p.font.size = Pt(37)
+                            p.font.size = Pt(36)
                     elif g_idx == 4:
                         if any(char in p_text for char in ["%", "4-6", "1.8", "37,500"]):
-                            p.font.size = Pt(45)
+                            p.font.size = Pt(44)
                             p.font.bold = True
                         elif "flight" in p_text.lower() or "kpi" in p_text.lower() or "package" in p_text.lower():
-                            p.font.size = Pt(34)
+                            p.font.size = Pt(32)
                         elif p.font.bold:
-                            p.font.size = Pt(28.5)
+                            p.font.size = Pt(28)
                         else:
-                            p.font.size = Pt(22.5)
+                            p.font.size = Pt(22)
                     elif g_idx in [5, 6]:
                         if any(c in p_text.lower() for c in ["live on nobrokerhood", "proven track record", "demonstrated roi"]):
                             p.font.size = Pt(34)
@@ -3537,13 +3571,13 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
                     for cell in row.cells:
                         for cp in cell.text_frame.paragraphs:
                             cp.alignment = PP_ALIGN.CENTER
-                            cp.font.size = Pt(22.5)
+                            cp.font.size = Pt(22)
                             cp.font.bold = True
 
         new_slide_element = sldIdLst[-1]
         sldIdLst.insert(gamma_insertion_start + g_idx, new_slide_element)
 
-    # --- STEP 5: POPULATE 3 BLANK TEMPLATE SLIDES WITH REAL CASE STUDIES ---
+    # --- STEP 5: POPULATE 3 BLANK TEMPLATE SLIDES WITH 1:1 CLONED REAL CASE STUDIES ---
     print(f"  🔍 [Case Study Engine] Searching for matching visual case studies for '{brand_name}' ({meeting_industry})...", flush=True)
     try:
         prs_south = load_cached_presentation_from_drive(
@@ -3556,7 +3590,7 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
         cat_south = extract_presentation_text_catalog(prs_south, "south")
         cat_regional = extract_presentation_text_catalog(prs_regional, "regional")
 
-        print(f"    📊 [Case Study Catalog]: Found {len(cat_south)} South slides, {len(cat_regional)} Regional slides.", flush=True)
+        print(f"    📊 [Case Study Catalog]: Loaded {len(cat_south)} South slides, {len(cat_regional)} Regional slides.", flush=True)
 
         best_3_slides = select_best_3_case_studies(
             catalog_south=cat_south,
@@ -3566,12 +3600,10 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
             brand_name=brand_name
         )
 
-        # Robust Multi-Strategy Search for the 'Case Studies' Divider Slide
-        # Handles newlines ("Case\nStudies") or searches back from the "Thank You" slide
+        # Locate the "Case Studies" section divider slide across the presentation
         case_studies_header_idx = -1
         total_slides = len(prs_master.slides)
 
-        # Strategy A: Regex whitespace search for "CASE STUDIES" on all text shapes
         for s_idx, s in enumerate(prs_master.slides):
             for shape in s.shapes:
                 if shape.has_text_frame:
@@ -3582,21 +3614,19 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
             if case_studies_header_idx != -1:
                 break
 
-        # Strategy B: Fallback - locate "THANK YOU" slide at the end (the 3 blank slides are right before it)
         if case_studies_header_idx == -1 and total_slides >= 5:
+            # Fallback anchor: Thank You slide is at the end
             for s_idx in range(total_slides - 1, max(0, total_slides - 4), -1):
                 s = prs_master.slides[s_idx]
                 for shape in s.shapes:
                     if shape.has_text_frame and "THANK YOU" in shape.text_frame.text.upper():
-                        # The 3 blank slides sit at s_idx - 3, s_idx - 2, s_idx - 1; divider is s_idx - 4
                         case_studies_header_idx = s_idx - 4
-                        print(f"  🔍 Located 'Case Studies' section via Thank You anchor (Slide {case_studies_header_idx + 1}).", flush=True)
                         break
                 if case_studies_header_idx != -1:
                     break
 
         if case_studies_header_idx != -1 and total_slides >= case_studies_header_idx + 4:
-            print(f"  🎯 [Case Study Engine] Located 'Case Studies' divider at Slide {case_studies_header_idx + 1}. Populating next 3 slides...", flush=True)
+            print(f"  🎯 [Case Study Engine] Located 'Case Studies' divider at Slide {case_studies_header_idx + 1}. 1:1 Cloning next 3 slides...", flush=True)
             for i, match in enumerate(best_3_slides):
                 target_slide_idx = case_studies_header_idx + 1 + i
                 target_blank_slide = prs_master.slides[target_slide_idx]
@@ -3604,10 +3634,10 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
                 src_prs = prs_south if match["deck"] == "south" else prs_regional
                 source_slide = src_prs.slides[match["slide_idx"]]
                 
-                print(f"    ⭐ Injecting Real Case Study {i+1}: From {match['deck'].title()} (Slide {match['slide_idx'] + 1}) into Master Slide {target_slide_idx + 1}...", flush=True)
-                copy_case_study_slide_contents(source_slide, target_blank_slide)
+                print(f"    ⭐ 1:1 Cloning Case Study {i+1}: From {match['deck'].title()} (Slide {match['slide_idx'] + 1}) into Master Slide {target_slide_idx + 1}...", flush=True)
+                clone_entire_slide_contents(source_slide, target_blank_slide)
         else:
-            print(f"  ⚠️ Could not find 'Case Studies' divider or 3 following slides (Divider found at: {case_studies_header_idx}). Skipping injection.", flush=True)
+            print(f"  ⚠️ Could not find 'Case Studies' divider or 3 following slides. Skipping injection.", flush=True)
 
     except Exception as e_cs:
         print(f"  ⚠️ Warning during real case study slide injection: {e_cs}", flush=True)
@@ -3637,7 +3667,7 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
     except Exception as perm_err:
         print(f"  ⚠️ Note on drive permissions: {perm_err}", flush=True)
 
-    print(f"  ✅ [Deck Engine] Presentation Spliced & Ready with Real Case Studies! Drive Link: {view_url}", flush=True)
+    print(f"  ✅ [Deck Engine] Presentation Spliced & Ready with 1:1 Real Case Studies! Drive Link: {view_url}", flush=True)
     return {
         "gamma_url": view_url,
         "pptx_download_url": view_url
@@ -3646,9 +3676,9 @@ def splice_gamma_slides_into_master_deck(drive_service, master_template_file_id,
 
 def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client, creative_image_bytes=None, event_id="", drive_service=None, output_folder_id="1RhhsFq5NGC2QtHPj8FQaU5BfhxJR5R6I", meeting_industry=None, sub_category_keywords=None):
     """
-    1. Generates 7 tailored cards via Gamma API with custom creative mockup.
+    1. Generates 7 tailored cards via Gamma API with custom creative mockup on Slide 3.
     2. Downloads Gamma's output PPTX.
-    3. Splices them into your Master Deck and injects 3 real visual case studies matching the industry.
+    3. Splices them into your Master Deck and 1:1 clones 3 real visual case studies matching the industry.
     """
     if not GAMMA_API_KEY:
         print("  ⚠️ [GAMMA] GAMMA_API_KEY is not set. Skipping PPT generation.", flush=True)
@@ -3658,7 +3688,7 @@ def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client, creative_im
     if creative_image_bytes:
         custom_mockup_url = upload_creative_to_gcs(creative_image_bytes, brand_name, event_id)
 
-    print(f"  📊 [GAMMA] Deep-mining brief to write 5 bespoke pitch cards for '{brand_name}'...", flush=True)
+    print(f"  📊 [GAMMA] Deep-mining brief to write 7 bespoke pitch cards for '{brand_name}'...", flush=True)
     deck_markdown = prepare_gamma_5_cards_with_gemini(
         gemini_client=gemini_client,
         brand_name=brand_name,
@@ -3671,7 +3701,6 @@ def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client, creative_im
         "Content-Type": "application/json"
     }
 
-    # Requesting 7 cards from Gamma
     payload = {
         "inputText": deck_markdown,
         "textMode": "generate",
@@ -3723,10 +3752,8 @@ def generate_gamma_pitch_deck(brand_name, brief_text, gemini_client, creative_im
             print("  ⚠️ [GAMMA] Export URL not ready in time.", flush=True)
             return None
 
-        # Download the 7 Gamma slides into memory
         gamma_pptx_bytes = requests.get(gamma_pptx_url, timeout=30).content
 
-        # Splice Gamma slides & real visual case studies into Master Deck
         return splice_gamma_slides_into_master_deck(
             drive_service=drive_service,
             master_template_file_id=NBH_MASTER_TEMPLATE_FILE_ID,
