@@ -1439,7 +1439,7 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
         campaign_entries.append("**Broad Industry Fallbacks (Low Relevance - Match ONLY if product category is identical):**")
         campaign_entries += matches_ind_p + matches_ind_o
 
-    # 2. READ CASE STUDIES DIRECTLY FROM CONSOLIDATED MASTER SHEET (LATEST DATES FIRST)
+    # 2. READ CASE STUDIES DIRECTLY FROM CONSOLIDATED MASTER SHEET (BULLETPROOF V2)
     cs_brand_p, cs_brand_o = [], []
     cs_sub_p, cs_sub_o = [], []
     cs_ind_p, cs_ind_o = [], []
@@ -1447,34 +1447,62 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
     try:
         CASE_STUDIES_MASTER_ID = "1931TAKD1jWI7Cmhboadni_7aIaPNirAT-YKUNgB0ikg"
         
-        # Check in-memory cache to read only once per bot execution
+        # Load rows once into in-memory cache
         if "master_case_studies_rows" not in GDRIVE_FILE_CACHE:
-            print("  📊 [Case Studies] Fetching live rows from 'Consolidated Case Studies - Master' sheet...")
-            sheet_resp = sheets_service.spreadsheets().values().get(
-                spreadsheetId=CASE_STUDIES_MASTER_ID,
-                range="'Main Sheet'!A1:J700"
-            ).execute()
-            GDRIVE_FILE_CACHE["master_case_studies_rows"] = sheet_resp.get('values', [])
-            print(f"  ✅ [Case Studies] Successfully loaded {len(GDRIVE_FILE_CACHE['master_case_studies_rows'])} rows.")
-        
+            print(f"  📊 [Case Studies] Connecting to Master Sheet ID: {CASE_STUDIES_MASTER_ID}...")
+            
+            raw_rows = []
+            try:
+                # 1. Ask Google for the EXACT active tab title dynamically (prevents 400 Bad Range errors)
+                sheet_meta = sheets_service.spreadsheets().get(spreadsheetId=CASE_STUDIES_MASTER_ID).execute()
+                active_tab_title = sheet_meta['sheets'][0]['properties']['title']
+                print(f"  📑 [Case Studies] Detected primary tab: '{active_tab_title}'")
+                
+                resp = sheets_service.spreadsheets().values().get(
+                    spreadsheetId=CASE_STUDIES_MASTER_ID,
+                    range=f"'{active_tab_title}'!A:Z"
+                ).execute()
+                raw_rows = resp.get('values', [])
+            except Exception as e_direct:
+                print(f"  ⚠️ [Case Studies] Direct sheet read issue ({e_direct}). Trying Drive search fallback...")
+                # 2. Drive Fallback: Search for the sheet by name if ID was blocked
+                drive_matches = drive_service.files().list(
+                    q="name contains 'Consolidated Case Studies' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false",
+                    fields="files(id, name)"
+                ).execute().get('files', [])
+                
+                if drive_matches:
+                    fallback_id = drive_matches[0]['id']
+                    print(f"  🔄 [Case Studies] Using Drive file '{drive_matches[0]['name']}' ({fallback_id})")
+                    resp = sheets_service.spreadsheets().values().get(
+                        spreadsheetId=fallback_id,
+                        range="A:Z"
+                    ).execute()
+                    raw_rows = resp.get('values', [])
+
+            GDRIVE_FILE_CACHE["master_case_studies_rows"] = raw_rows
+            print(f"  ✅ [Case Studies] Loaded {len(raw_rows)} total rows into memory.")
+
         cs_all_rows = GDRIVE_FILE_CACHE.get("master_case_studies_rows", [])
 
         if cs_all_rows and len(cs_all_rows) > 1:
             cs_headers = [str(h).strip().lower() for h in cs_all_rows[0]]
             cs_data = cs_all_rows[1:]
 
-            # Column position mapping
-            b_idx = cs_headers.index("brand name") if "brand name" in cs_headers else 0
-            ind_idx = cs_headers.index("industry") if "industry" in cs_headers else 1
-            sub_idx = cs_headers.index("sub_category") if "sub_category" in cs_headers else 2
-            date_idx = cs_headers.index("date") if "date" in cs_headers else 3
-            camp_idx = cs_headers.index("campaign name") if "campaign name" in cs_headers else 4
-            city_idx = cs_headers.index("targeted city") if "targeted city" in cs_headers else 5
-            asset_idx = cs_headers.index("asset type") if "asset type" in cs_headers else 7
-            detail_idx = cs_headers.index("targeting detail:") if "targeting detail:" in cs_headers else 8
-            type_idx = cs_headers.index("campaign type") if "campaign type" in cs_headers else 9
+            # Flexible column detection by keywords
+            b_idx, ind_idx, sub_idx, date_idx, camp_idx, city_idx, asset_idx, detail_idx, type_idx = 0, 1, 2, 3, 4, 5, 7, 8, 9
+            for idx, h in enumerate(cs_headers):
+                if "brand" in h: b_idx = idx
+                elif "sub" in h or "category" in h: sub_idx = idx
+                elif "ind" in h or "vert" in h: ind_idx = idx
+                elif "date" in h or "year" in h or "month" in h: date_idx = idx
+                elif "camp" in h and "type" not in h: camp_idx = idx
+                elif "city" in h: city_idx = idx
+                elif "asset" in h or "media" in h: asset_idx = idx
+                elif "detail" in h or "target" in h: detail_idx = idx
+                elif "type" in h: type_idx = idx
 
-            # Helper: Turn "September 2026" or "April 2026" into a sortable tuple (2026, 9)
+            # Month/Year chronological sorting helper
             month_map = {
                 "january": 1, "jan": 1, "february": 2, "feb": 2, "march": 3, "mar": 3,
                 "april": 4, "apr": 4, "may": 5, "june": 6, "jun": 6, "july": 7, "jul": 7,
@@ -1493,11 +1521,13 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
                         break
                 return (yr, mo)
 
-            # Sort rows so NEWEST dates come FIRST
+            # Sort all rows so LATEST DATES (2026, 2025) are at the TOP
             sorted_cs_data = sorted(cs_data, key=get_date_sort_tuple, reverse=True)
 
             valid_sub_kws = [k.strip().lower() for k in sub_category_keywords if k and len(k.strip()) > 2]
             valid_ind_kws = [k.strip().lower() for k in strict_keywords if k and len(k.strip()) > 2]
+            # Add base words for fuzzy match (e.g. 'manipal' from 'manipal hospital')
+            clean_brand_words = [w for w in re.split(r'\s+', brand_clean) if len(w) > 3]
 
             for r in sorted_cs_data:
                 c_brand = str(r[b_idx]).strip() if len(r) > b_idx else ""
@@ -1518,33 +1548,44 @@ def get_internal_nbh_data_for_brand(drive_service, sheets_service, gemini_llm_cl
                 tag = " [📍 SAME CITY MATCH]" if is_city_match else ""
                 is_priority = bool(is_city_match)
 
-                # Format single clean case study line
                 display_asset = f" | Assets: {c_asset}" if c_asset else ""
                 display_detail = f" | Details: {c_detail}" if c_detail else ""
                 entry = f"- {c_brand} ({c_city}): {c_camp or 'Campaign'} ({c_type}){display_asset}{display_detail} | Date: {c_date}{tag}"
+                
+                c_brand_lower = c_brand.lower()
                 entry_lower = entry.lower()
 
-                # Priority 1: Exact Brand Match (Newest to Oldest)
-                if brand_clean and len(brand_clean) > 2 and (brand_clean in c_brand.lower() or c_brand.lower() in brand_clean):
+                # Priority 1: Exact Brand Match (e.g. 'Manipal Hospital' == 'Manipal Hospital' or contains 'manipal')
+                is_exact_brand = (brand_clean in c_brand_lower or c_brand_lower in brand_clean) or \
+                                 (any(w in c_brand_lower for w in clean_brand_words))
+
+                if is_exact_brand:
                     if is_priority and len(cs_brand_p) < 4:
                         cs_brand_p.append(entry)
                     elif not is_priority and len(cs_brand_o) < 4:
                         cs_brand_o.append(entry)
-                # Priority 2: Sub-Category / Competitor Match (Newest to Oldest)
-                elif valid_sub_kws and (any(k in c_sub for k in valid_sub_kws) or any(k in entry_lower for k in valid_sub_kws)):
+                    continue
+
+                # Priority 2: Sub-Category / Competitor Match (e.g. 'hospital', 'healthcare')
+                if valid_sub_kws and (any(k in c_sub for k in valid_sub_kws) or any(k in entry_lower for k in valid_sub_kws)):
                     if is_priority and len(cs_sub_p) < 6:
                         cs_sub_p.append(entry)
                     elif not is_priority and len(cs_sub_o) < 6:
                         cs_sub_o.append(entry)
-                # Priority 3: Broad Industry Match (Newest to Oldest)
-                elif valid_ind_kws and (any(k in c_ind for k in valid_ind_kws) or any(k in entry_lower for k in valid_ind_kws)):
+                    continue
+
+                # Priority 3: Broad Industry Match (e.g. 'healthcare')
+                if valid_ind_kws and (any(k in c_ind for k in valid_ind_kws) or any(k in entry_lower for k in valid_ind_kws)):
                     if is_priority and len(cs_ind_p) < 6:
                         cs_ind_p.append(entry)
                     elif not is_priority and len(cs_ind_o) < 6:
                         cs_ind_o.append(entry)
 
+            total_found = len(cs_brand_p) + len(cs_brand_o) + len(cs_sub_p) + len(cs_sub_o) + len(cs_ind_p) + len(cs_ind_o)
+            print(f"  🎯 [Case Studies] Matched {total_found} relevant case studies for '{brand_clean}' (Exact: {len(cs_brand_p)+len(cs_brand_o)}, Competitors: {len(cs_sub_p)+len(cs_sub_o)})")
+
     except Exception as e_cs:
-        print(f"  ⚠️ Warning querying case_studies from Master Sheet: {e_cs}")
+        print(f"  ⚠️ [Case Studies] Error reading Master Sheet: {e_cs}")
 
     if cs_brand_p or cs_brand_o:
         case_study_entries.append("**Exact Brand Case Studies:**")
